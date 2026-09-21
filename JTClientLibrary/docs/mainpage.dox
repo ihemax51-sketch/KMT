@@ -1,0 +1,11 @@
+\mainpage Welcome to Doxygen
+
+
+
+/*! \mainpage Welcome to Doxygen
+ *
+ * This site only contains code documentation. For documentation on the setup visit:
+ *
+ * https://florian0.gitlab.io/sro_devkit/
+ *
+ */

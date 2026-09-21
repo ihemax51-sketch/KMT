@@ -1,0 +1,36 @@
+#pragma once
+
+#include <GFXMainFrame/GWndBase.h>
+
+#include "BasicWindow.h"
+
+namespace Devkit
+{
+    /// \brief Tree-view representation of all UI elements in the current process
+    class InterfaceTree : public BasicWindow {
+    public:
+        InterfaceTree();
+
+        /// \brief Create the window
+        void Render();
+
+    private:
+        /// \brief Creates an ImGui Tree Node for the given element and recurses it's children
+        /// \details Children are only recursed if the tree node is not collapsed.
+        void RecurseElement(const CGWndBase *element);
+
+        /// \brief Draw a colored outline of given elements proportions
+        void DrawOutline(const CGWndBase *element);
+
+        /// \brief Calculates the color for the outline dependend on the number of draws
+        /// \details Creates an evenly spaced map of colors based on the numbers of the last draw and
+        ///          returns the color at the position of the current draw.
+        int GetOutlineColor() const;
+
+    private:
+        bool drawOutline;
+        bool showOnlyVisible;
+        int lastNumberOfDraws;
+        int currentNumberOfDraws;
+    };
+}

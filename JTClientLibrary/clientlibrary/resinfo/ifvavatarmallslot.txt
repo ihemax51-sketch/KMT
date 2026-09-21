@@ -1,0 +1,65 @@
+Interface Text
+
+
+Section = Create,"0,0,0,0","0"
+{
+	GDR_SLOT:CIFSlotWithHelp
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,88,94,213"
+		CommandID=INTEGER,"0"
+		DDJ=STRING,""
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"0"
+		HelpString=STRING,""
+		ID=INTEGER,"8"
+		Rect=RECT,"21,8,32,32"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"0"
+	}
+	GDR_STATIC_5:CIFStatic
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,72,211,143"
+		DDJ=STRING,""
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"0"
+		ID=INTEGER,"7"
+		Rect=RECT,"27,52,16,16"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"1"
+	}
+	GDR_STATIC_4:CIFStatic
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,72,211,143"
+		DDJ=STRING,"clientlibrary\\mall\\mall_silk.ddj"
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"0"
+		ID=INTEGER,"6"
+		Rect=RECT,"8,52,15,15"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"0"
+	}
+}

@@ -1,0 +1,3 @@
+[submodule "source/SilkroadOnline/TOOLS_PLUGINS/3rd-party/dxsdk"]
+	path = source/SilkroadOnline/TOOLS_PLUGINS/3rd-party/dxsdk
+	url = https://gitlab.com/kyuubi09/dxsdk9b-minimal

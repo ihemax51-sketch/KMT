@@ -1,0 +1,14 @@
+w_metadata ninja apps \
+    title="Ninja (v1.11.1)" \
+    publisher="Ninja" \
+    year="2022" \
+    media="download" \
+    file1="ninja-win.zip" \
+    installed_exe1="${W_PROGRAMS_WIN}/Ninja/ninja.exe"
+
+load_ninja()
+{
+    w_download https://github.com/ninja-build/ninja/releases/download/v1.11.1/ninja-win.zip
+    w_try_unzip "${W_PROGRAMS_WIN}/Ninja/" "${W_CACHE}/${W_PACKAGE}/${file1}"
+    w_append_path "${W_PROGRAMS_WIN}/Ninja/"
+}

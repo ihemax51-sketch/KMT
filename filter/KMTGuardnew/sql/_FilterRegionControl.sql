@@ -1,0 +1,41 @@
+IF OBJECT_ID(N'dbo.Security_RegionFeatures', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Security_RegionFeatures
+    (
+        ID int IDENTITY(1,1) NOT NULL CONSTRAINT PK_Security_RegionFeatures PRIMARY KEY,
+        WorldID int NOT NULL CONSTRAINT DF_RegionFeatures_World DEFAULT (0),
+        RegionID int NOT NULL,
+        RuleName nvarchar(64) NULL,
+        Enabled bit NOT NULL CONSTRAINT DF_RegionFeatures_Enabled DEFAULT (1),
+        BuildMode tinyint NOT NULL CONSTRAINT DF_RegionFeatures_Build DEFAULT (0),
+        JobMode tinyint NOT NULL CONSTRAINT DF_RegionFeatures_Job DEFAULT (0),
+        RaceMode tinyint NOT NULL CONSTRAINT DF_RegionFeatures_Race DEFAULT (0),
+        PartyMode tinyint NOT NULL CONSTRAINT DF_RegionFeatures_PartyMode DEFAULT (0),
+        MinLevel tinyint NOT NULL CONSTRAINT DF_RegionFeatures_MinLevel DEFAULT (0),
+        MaxLevel tinyint NOT NULL CONSTRAINT DF_RegionFeatures_MaxLevel DEFAULT (0),
+        AllowTeleport bit NOT NULL CONSTRAINT DF_RegionFeatures_Teleport DEFAULT (1),
+        AllowReverse bit NOT NULL CONSTRAINT DF_RegionFeatures_Reverse DEFAULT (1),
+        AllowTrace bit NOT NULL CONSTRAINT DF_RegionFeatures_Trace DEFAULT (1),
+        AllowMovement bit NOT NULL CONSTRAINT DF_RegionFeatures_Movement DEFAULT (1),
+        AllowChat bit NOT NULL CONSTRAINT DF_RegionFeatures_Chat DEFAULT (1),
+        AllowGlobalChat bit NOT NULL CONSTRAINT DF_RegionFeatures_Global DEFAULT (1),
+        AllowParty bit NOT NULL CONSTRAINT DF_RegionFeatures_Party DEFAULT (1),
+        AllowExchange bit NOT NULL CONSTRAINT DF_RegionFeatures_Exchange DEFAULT (1),
+        AllowStall bit NOT NULL CONSTRAINT DF_RegionFeatures_Stall DEFAULT (1),
+        AllowPvP bit NOT NULL CONSTRAINT DF_RegionFeatures_PvP DEFAULT (1),
+        AllowAlchemy bit NOT NULL CONSTRAINT DF_RegionFeatures_Alchemy DEFAULT (1),
+        AllowSpecialItems bit NOT NULL CONSTRAINT DF_RegionFeatures_Items DEFAULT (1),
+        AllowBerserk bit NOT NULL CONSTRAINT DF_RegionFeatures_Berserk DEFAULT (1),
+        AutoPvpCape tinyint NOT NULL CONSTRAINT DF_RegionFeatures_Cape DEFAULT (0),
+        InactivityReturnSeconds int NOT NULL CONSTRAINT DF_RegionFeatures_Inactivity DEFAULT (0),
+        EventSuitMode tinyint NOT NULL CONSTRAINT DF_RegionFeatures_EventSuit DEFAULT (0),
+        ManagedEventCode nvarchar(32) NULL,
+        ManagedAtUtc datetime2(0) NULL,
+        CreatedAt datetime2(0) NOT NULL CONSTRAINT DF_RegionFeatures_Created DEFAULT (SYSUTCDATETIME()),
+        UpdatedAt datetime2(0) NULL,
+        CONSTRAINT CK_RegionFeatures_Region CHECK (RegionID BETWEEN -32768 AND 32767 AND RegionID<>0),
+        CONSTRAINT CK_RegionFeatures_Modes CHECK (BuildMode BETWEEN 0 AND 3 AND JobMode BETWEEN 0 AND 5 AND RaceMode BETWEEN 0 AND 2 AND PartyMode BETWEEN 0 AND 2 AND EventSuitMode BETWEEN 0 AND 2),
+        CONSTRAINT CK_RegionFeatures_Values CHECK ((MaxLevel=0 OR MinLevel=0 OR MaxLevel>=MinLevel) AND AutoPvpCape BETWEEN 0 AND 5 AND InactivityReturnSeconds BETWEEN 0 AND 86400),
+        CONSTRAINT UQ_RegionFeatures_World_Region UNIQUE (WorldID,RegionID)
+    );
+END;

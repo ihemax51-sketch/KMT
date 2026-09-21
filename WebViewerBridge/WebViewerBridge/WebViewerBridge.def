@@ -1,0 +1,11 @@
+LIBRARY "WebViewerBridge"
+EXPORTS
+    WVB_Initialize
+    WVB_Show
+    WVB_Navigate
+    WVB_Move
+    WVB_Hide
+    WVB_Destroy
+    WVB_IsVisible
+    WVB_IsRuntimeAvailable
+

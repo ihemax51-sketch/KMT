@@ -1,0 +1,78 @@
+site_name: SRO_DevKit
+site_description: "Customize your client and create awesome game-features with C++. No assembly required."
+
+repo_url: https://gitlab.com/florian0/sro_devkit
+
+copyright: Copyright &copy; 2016-2024 florian0
+
+theme:
+  name: material
+  features:
+    - tabs
+  palette:
+    scheme: slate
+    primary: purple
+    accent: purple
+
+  custom_dir: 'docs/overrides'
+  
+  # 404 page
+  static_templates:
+    - 404.html
+
+extra_javascript:
+  - particles.min.js
+    
+markdown_extensions:
+  - markdown.extensions.admonition
+  - pymdownx.arithmatex
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.inlinehilite
+  - pymdownx.magiclink
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tabbed
+  - pymdownx.tilde
+  
+# Page tree
+nav:
+  - Home: index.md
+  - Getting started: 
+    - "getting-started/index.md"
+    - Supported IDEs:
+      - "getting-started/supported-ides/clion/index.md"
+      - "getting-started/supported-ides/visual-studio/index.md"
+      - "getting-started/supported-ides/vscode/index.md"
+    - Required Tools:
+      - "getting-started/required-tools/cmake/index.md"
+      - "getting-started/required-tools/ninja/index.md"
+      - "getting-started/required-tools/visual-studio-2005/index.md"
+      - "getting-started/required-tools/git/index.md"
+  - Features: features.md
+  - User Interface:
+    - "user-interface/creating-windows.md"
+  - Networking:
+    - "networking/basic-concept.md"
+  - Advanced:
+    - "advanced/creating-tests.md"
+    - "advanced/working-with-data.md"
+  - "advanced/doxygen.md"
+  - contributing.md
+  - code-style.md
+  - ci.md
+  - license.md
+  
+  
+  
+  
+  

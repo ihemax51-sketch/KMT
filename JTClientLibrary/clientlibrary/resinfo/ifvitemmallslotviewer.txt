@@ -1,0 +1,63 @@
+Interface Text
+
+
+Section = Create,"0,0,0,0","0"
+{
+	GDR_SLOT_3:CIFVItemMallSlot
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,72,211,143"
+		DDJ=STRING,""
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"0"
+		ID=INTEGER,"5"
+		Rect=RECT,"406,5,165,138"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"0"
+	}
+	GDR_SLOT_2:CIFVItemMallSlot
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,72,211,143"
+		DDJ=STRING,""
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"0"
+		ID=INTEGER,"4"
+		Rect=RECT,"225,5,165,138"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"0"
+	}
+	GDR_SLOT_1:CIFVItemMallSlot
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,72,211,143"
+		DDJ=STRING,""
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"0"
+		ID=INTEGER,"3"
+		Rect=RECT,"44,5,165,138"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"0"
+	}
+}

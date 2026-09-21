@@ -1,0 +1,11 @@
+{
+  "buttons": [
+    {
+      "name": "Website",
+      "icon": "clientlibrary\\guides\\kmt_web_viewer_1.ddj",
+      "url": "https://example.com",
+      "frameWidth": 1000,
+      "frameHeight": 650
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+# Generic
+BinOut/
+CMakeUserPresets.json
+
+# IntelliJ
+.idea/
+cmake-build-*/
+
+# Visual Studio
+.vs/
+
+# Python
+venv/
+*.pyc
+

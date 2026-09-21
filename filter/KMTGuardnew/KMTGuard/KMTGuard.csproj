@@ -1,0 +1,62 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+
+		<!-- Single-file settings -->
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>false</SelfContained>
+		<!-- يخلي الـ .NET runtime جوّا الـ EXE -->
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<!-- لو 32-bit استخدم win-x86 -->
+		<UseAppHost>true</UseAppHost>
+		<!-- ينتج EXE فعلي -->
+		<EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+		<IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+
+		<!-- إخراج نظيف -->
+		<DebugType>none</DebugType>
+		<!-- ما يطلعش PDB جنبك -->
+		<GenerateDocumentationFile>false</GenerateDocumentationFile>
+
+		<!-- متعطلة لتجنب مشاكل الانعكاس (Serilog/Dapper/System.Management) -->
+		<PublishTrimmed>false</PublishTrimmed>
+		<!-- لو عايز تقلّل الحجم لاحقًا، نقدر نفعّلها ونضبط keep rules -->
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Dapper" Version="2.1.35" />
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+		<PackageReference Include="Serilog" Version="4.3.0" />
+		<PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+		<PackageReference Include="System.Management" Version="9.0.10" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\SilkroadSecurityAPI\SilkroadSecurityAPI.csproj" />
+		<ProjectReference Include="..\KMTGuard.RuntimeContract\KMTGuard.RuntimeContract.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="KMTGuard.PacketPipelineTests" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Include="webviewer.json" CopyToOutputDirectory="PreserveNewest" />
+		<Content Include="Languages\*.json"
+				 CopyToOutputDirectory="PreserveNewest"
+				 CopyToPublishDirectory="PreserveNewest"
+				 ExcludeFromSingleFile="true" />
+		<Content Include="Languages\README.txt"
+				 CopyToOutputDirectory="PreserveNewest"
+				 CopyToPublishDirectory="PreserveNewest"
+				 ExcludeFromSingleFile="true" />
+	</ItemGroup>
+
+</Project>

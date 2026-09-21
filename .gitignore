@@ -1,0 +1,63 @@
+# Workspace staging, diagnostics, and temporary files
+/.artifacts/
+/.build-check/
+/.codex-temp/
+/.tmpbuild/
+/build/
+/build_verify/
+/build_logs/
+/dump/
+/_build_obj/
+/_build_out/
+/_menu_crop_candidates/
+
+# .NET outputs
+/KMTGuard.*/bin/
+/KMTGuard.*/obj/
+/filter/KMTGuardnew/*/bin/
+/filter/KMTGuardnew/*/obj/
+/tools/*/bin/
+/tools/*/obj/
+
+# CMake and Visual Studio outputs
+/JTClientLibrary/build-*/
+/JTClientLibrary/BinOut/
+/JTClientLibrary/source/out/
+/gameserver/build-*/
+/gameserver/source/out/
+/BinOut/
+/WebViewerBridge/WebViewerBridge/Win32/
+/ShardManager/Release/
+/ShardManager/vSRO-ShardManager/Debug/
+/ShardManager/vSRO-ShardManager/Release/
+/ShardManager/vSRO-ShardManager/KMTGuard.*/
+/ShardManager/vSRO-ShardManager/x64/
+
+# IDE state and generated compiler files
+**/.vs/
+**/.idea/
+*.user
+*.suo
+*.VC.db
+*.opendb
+*.ipch
+*.iobj
+*.ipdb
+*.ilk
+*.pdb
+*.tlog
+*.lastbuildstate
+
+# Root-level build scratch files
+/cl_stderr*.txt
+/cl_stdout*.txt
+/full-rebuild-warnings.log
+/*.obj
+/*.pdb
+/_test.dds
+
+# Local source backup archive (not required for Git diff baselines)
+/kmt-source.rar
+
+# Independent launcher workspace
+/SilkroadLauncher/

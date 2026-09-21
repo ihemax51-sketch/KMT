@@ -1,0 +1,63 @@
+Interface Text
+
+
+Section = Create,"0,0,0,0","0"
+{
+	GDR_SIDE:CIFStatic
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,108,205,164"
+		DDJ=STRING,""
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"1"
+		ID=INTEGER,"5"
+		Rect=RECT,"211,4,20,16"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"1"
+	}
+	GDR_NAME:CIFStatic
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,108,205,164"
+		DDJ=STRING,""
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"1"
+		ID=INTEGER,"4"
+		Rect=RECT,"110,4,16,16"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"1"
+	}
+	GDR_BAR:CIFBarWnd
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,108,205,164"
+		DDJ=STRING,"interface\\ifcommon\\com_bar01_"
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"1"
+		ID=INTEGER,"3"
+		Rect=RECT,"0,0,240,24"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"1"
+	}
+}

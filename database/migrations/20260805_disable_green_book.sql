@@ -1,0 +1,224 @@
+/*
+    Adds the customer-controlled DisableGreenBook GameServer setting.
+
+    False = preserve the original Green Book behavior.
+    True  = disable Green Book restrictions after every GameServer restarts.
+*/
+
+USE [KMTGuard];
+GO
+
+SET NOCOUNT ON;
+SET XACT_ABORT ON;
+GO
+
+IF OBJECT_ID(N'dbo.System_Settings', N'U') IS NULL
+    THROW 51000, 'KMTGuard.dbo.System_Settings was not found.', 1;
+GO
+
+IF EXISTS
+(
+    SELECT SettingName
+    FROM dbo.System_Settings
+    WHERE SettingName = N'DisableGreenBook'
+    GROUP BY SettingName
+    HAVING COUNT_BIG(*) > 1
+)
+    THROW 51001, 'Duplicate DisableGreenBook settings already exist in dbo.System_Settings.', 1;
+GO
+
+IF NOT EXISTS
+(
+    SELECT 1
+    FROM dbo.System_Settings WITH (UPDLOCK, HOLDLOCK)
+    WHERE SettingName = N'DisableGreenBook'
+)
+BEGIN
+    INSERT dbo.System_Settings (SettingName, Value)
+    VALUES (N'DisableGreenBook', N'False');
+END;
+GO
+
+IF COL_LENGTH(N'dbo.System_Settings', N'Category') IS NOT NULL
+   AND COL_LENGTH(N'dbo.System_Settings', N'DisplayOrder') IS NOT NULL
+   AND COL_LENGTH(N'dbo.System_Settings', N'Description') IS NOT NULL
+BEGIN
+    EXEC(N'
+        UPDATE dbo.System_Settings
+        SET Category = N''GameServer.Patches'',
+            DisplayOrder = 10,
+            Description = N''Disables Green Book restrictions. Requires every GameServer to restart.''
+        WHERE SettingName = N''DisableGreenBook'';
+    ');
+END;
+GO
+
+CREATE OR ALTER VIEW dbo.vw_Settings_InvalidValues
+AS
+WITH setting_type_catalog AS
+(
+    SELECT SettingName, ExpectedType
+    FROM
+    (
+        VALUES
+            (N'AutoStart', N'bool'),
+            (N'AccountDB', N'string'),
+            (N'LogDB', N'string'),
+            (N'ShardDB', N'string'),
+            (N'RemoveCaptcha', N'bool'),
+            (N'CaptchaValue', N'string'),
+            (N'OldLogin', N'bool'),
+            (N'OldExpBar', N'bool'),
+            (N'OldAlchemy', N'bool'),
+            (N'GrantNameButton', N'bool'),
+            (N'IconManagerButton', N'bool'),
+            (N'IconManagerRight', N'bool'),
+            (N'TitleManager', N'bool'),
+            (N'TitleManagerColor', N'bool'),
+            (N'DynamicRanking', N'bool'),
+            (N'DynamicRankingRefreshMinutes', N'int'),
+            (N'VipSystemEnabled', N'bool'),
+            (N'UniqueHistory', N'bool'),
+            (N'EventRegister', N'bool'),
+            (N'EventSchedule', N'bool'),
+            (N'Achievements', N'bool'),
+            (N'SecondarySlot', N'bool'),
+            (N'MoveSkillBoard', N'bool'),
+            (N'ServerInfoSkill', N'bool'),
+            (N'OldMainPopup', N'bool'),
+            (N'HideTitleWhileTagActive', N'bool'),
+            (N'ItemComparison', N'bool'),
+            (N'AutoSort', N'bool'),
+            (N'PartyMemberViewer', N'bool'),
+            (N'AutoSkillUpdate', N'bool'),
+            (N'MasteryLimit', N'int'),
+            (N'ServerMaxLevel', N'int'),
+            (N'FixDamageText', N'bool'),
+            (N'AutoStrInt', N'bool'),
+            (N'PickupEffect', N'bool'),
+            (N'PermanentAlchemy', N'bool'),
+            (N'ShowGuildInJobMode', N'bool'),
+            (N'UniqueTarget', N'bool'),
+            (N'Macro', N'bool'),
+            (N'SecondaryPassword', N'bool'),
+            (N'NewCharInfo', N'bool'),
+            (N'NewIdPw', N'bool'),
+            (N'EnableQuickLogin', N'bool'),
+            (N'FacebookURL', N'string'),
+            (N'DiscordURL', N'string'),
+            (N'WebsiteURL', N'string'),
+            (N'Changelog', N'bool'),
+            (N'ShowChangelogFirstSpawn', N'bool'),
+            (N'FixNewJobSuit', N'bool'),
+            (N'OldItemMall', N'bool'),
+            (N'InsertCommaPrices', N'bool'),
+            (N'WriteCharacterBound', N'bool'),
+            (N'NewItemMall', N'bool'),
+            (N'EmojiSystem', N'bool'),
+            (N'NewPartyMatch', N'bool'),
+            (N'NewJobUI', N'bool'),
+            (N'NewAlchemy', N'bool'),
+            (N'ShowOnlinePlayers', N'bool'),
+            (N'ServerName', N'string'),
+            (N'FakePlayerCount', N'int'),
+            (N'CheckStatus', N'bool'),
+            (N'HWID_LIMIT', N'int'),
+            (N'HWID_JOB_LIMIT', N'int'),
+            (N'AlchemyItemLinkMinLevel', N'int'),
+            (N'DisableReverseInJob', N'bool'),
+            (N'ReverseDelay', N'int'),
+            (N'MaxPlus', N'int'),
+            (N'DisableAcademy', N'bool'),
+            (N'DisableDurability', N'bool'),
+            (N'DisableGreenBook', N'bool'),
+            (N'DisableAutoAttack', N'bool'),
+            (N'AutoAttackMaxLevel', N'int'),
+            (N'DisableTraceWhileJob', N'bool'),
+            (N'StallDelay', N'int'),
+            (N'StallLevel', N'int'),
+            (N'ExchangeDelay', N'int'),
+            (N'ExchangeLevel', N'int'),
+            (N'GuildInviteDelay', N'int'),
+            (N'UnionInviteDelay', N'int'),
+            (N'GlobalDelay', N'int'),
+            (N'GlobalLevel', N'int'),
+            (N'LiveItemDelay', N'int'),
+            (N'TradePetSpawnDelay', N'int'),
+            (N'RestartDelay', N'int'),
+            (N'ExitDelay', N'int'),
+            (N'EnableItemTranslation', N'bool'),
+            (N'ItemTranslationPayment', N'int'),
+            (N'ItemTranslationPrice', N'int'),
+            (N'SHOW_CHAR_INFO_DELAY', N'int'),
+            (N'NonClosePTForm', N'bool'),
+            (N'EnableLuckySpin', N'bool'),
+            (N'EnableLuckySpinSilk', N'bool'),
+            (N'LuckySpinPrice', N'int'),
+            (N'ShowGuideMenu', N'bool'),
+            (N'ShowGuideLuckySpin', N'bool'),
+            (N'ShowGuideItemChest', N'bool'),
+            (N'ShowGuideDropLogs', N'bool'),
+            (N'ShowGuideMacro', N'bool'),
+            (N'ShowGuideDailyLogin', N'bool'),
+            (N'ShowGuideDiscord', N'bool'),
+            (N'ShowGuideWebsite', N'bool'),
+            (N'ShowGuideFacebook', N'bool'),
+            (N'ShowGuideAutoEquip', N'bool'),
+            (N'AutoEquipMaxLevel', N'int'),
+            (N'ShowGuideWebViewer', N'bool'),
+            (N'ShowGuideMapLocation', N'bool'),
+            (N'EnableSpecialOffers', N'bool'),
+            (N'ShowGuideSpecialOffers', N'bool'),
+            (N'ShowGuideKillerAnimation', N'bool'),
+            (N'NewInventoryDesign', N'bool'),
+            (N'EnableOfflineStall', N'bool'),
+            (N'Menu-like-maxi', N'bool'),
+            (N'MenuLikeMaxi', N'bool'),
+            (N'OfflineStallMaxHours', N'int'),
+            (N'OfflineStallConfirmSeconds', N'int'),
+            (N'EnablePvpChallenge', N'bool'),
+            (N'ShowGuidePvpChallenge', N'bool'),
+            (N'EnableTradeSellCaptcha', N'bool'),
+            (N'TradeSellCaptchaTimeoutSeconds', N'int'),
+            (N'TradeSellCaptchaMaxAttempts', N'int'),
+            (N'AllowBotLogin', N'bool'),
+            (N'AllowBotTrade', N'bool'),
+            (N'BotProtectionLogEnabled', N'bool'),
+            (N'IPLimit', N'int'),
+            (N'MaxPlusDevil', N'int'),
+            (N'Security_InternalPacketSharedSecret', N'string'),
+            (N'EnablePartyMonsterSpawn', N'bool'),
+            (N'PartyMonsterMinimumMembers', N'int'),
+            (N'PartyMonsterSpawnRate', N'int')
+    ) AS catalog(SettingName, ExpectedType)
+),
+typed AS
+(
+    SELECT
+        settings.SettingName,
+        settings.Value,
+        COALESCE(catalog.ExpectedType, N'unknown') AS ExpectedType
+    FROM dbo.System_Settings AS settings
+    LEFT JOIN setting_type_catalog AS catalog
+        ON catalog.SettingName = settings.SettingName
+)
+SELECT SettingName, Value, ExpectedType
+FROM typed
+WHERE
+    ExpectedType = N'unknown'
+    OR (ExpectedType = N'bool' AND Value NOT IN (N'True', N'False'))
+    OR (ExpectedType = N'int' AND TRY_CONVERT(INT, Value) IS NULL)
+    OR
+    (
+        SettingName = N'PartyMonsterMinimumMembers'
+        AND TRY_CONVERT(INT, Value) NOT BETWEEN 1 AND 9
+    )
+    OR
+    (
+        SettingName = N'PartyMonsterSpawnRate'
+        AND TRY_CONVERT(INT, Value) NOT BETWEEN 0 AND 100
+    );
+GO
+
+PRINT 'DisableGreenBook is available and defaults to False.';
+GO

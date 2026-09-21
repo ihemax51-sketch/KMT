@@ -1,0 +1,8 @@
+# Visual Studio cache
+.vs/
+
+# Auto generated files
+Release/*
+vSRO-GameServer/Release/*
+vSRO-ShardManager/Release/*
+vSRO-ClientPatch/Release/*

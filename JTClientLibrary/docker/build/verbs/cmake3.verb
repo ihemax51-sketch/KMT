@@ -1,0 +1,15 @@
+
+w_metadata cmake3 apps \
+    title="CMake 3.26.4 (x64)" \
+    publisher="Kitware" \
+    year="2023" \
+    media="download" \
+    file1="cmake-3.26.4-windows-x86_64.msi" \
+    installed_exe1="${W_PROGRAMS_WIN}/CMake/bin/cmake-gui.exe"
+
+load_cmake3()
+{
+    w_download https://github.com/Kitware/CMake/releases/download/v3.26.4/cmake-3.26.4-windows-x86_64.msi 
+    w_try_cd "${W_CACHE}/${W_PACKAGE}"
+    w_try "${WINE}" msiexec /i cmake-3.26.4-windows-x86_64.msi ADD_CMAKE_TO_PATH=User /qn
+}

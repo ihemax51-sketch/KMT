@@ -1,0 +1,63 @@
+Interface Text
+
+
+Section = Create,"0,0,0,0","0"
+{
+	GDR_3:CIFStatic
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,166,121,118"
+		DDJ=STRING,"clientlibrary\\counter\\count_5.ddj"
+		FontColor=COLOR,"255,239,218,164"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"1"
+		ID=INTEGER,"10"
+		Rect=RECT,"60,0,18,31"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"1"
+	}
+	GDR_2:CIFStatic
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,166,121,118"
+		DDJ=STRING,"clientlibrary\\counter\\count_slash.ddj"
+		FontColor=COLOR,"255,239,218,164"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"1"
+		ID=INTEGER,"9"
+		Rect=RECT,"30,0,18,31"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"1"
+	}
+	GDR_1:CIFStatic
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,166,121,118"
+		DDJ=STRING,"clientlibrary\\counter\\count_1.ddj"
+		FontColor=COLOR,"255,239,218,164"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"1"
+		ID=INTEGER,"8"
+		Rect=RECT,"0,0,16,36"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"1"
+	}
+}

@@ -1,0 +1,25 @@
+Interface Text
+
+
+Section = Create,"0,0,0,0","0"
+{
+	GDR_BG:CIFNormalTile
+	{
+		ClientRect=RECT,"0,0,0,0"
+		Color=COLOR,"255,72,211,143"
+		DDJ=STRING,"interface\\ifcommon\\bg_tile\\com_bg_tile_u.ddj"
+		FontColor=COLOR,"255,255,255,255"
+		FontIndex=INTEGER,"0"
+		HAlign=INTEGER,"0"
+		ID=INTEGER,"1"
+		Rect=RECT,"0,0,285,285"
+		Style=INTEGER,"0"
+		SubSection=STRING,""
+		Text=STRING,""
+		UV_LB=POINT,"0,1"
+		UV_LT=POINT,"0,0"
+		UV_RB=POINT,"1,1"
+		UV_RT=POINT,"1,0"
+		VAlign=INTEGER,"0"
+	}
+}

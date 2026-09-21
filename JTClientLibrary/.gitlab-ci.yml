@@ -1,0 +1,77 @@
+variables:
+  DOCKER_DRIVER: overlay2
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"' # or "push". See https://docs.gitlab.com/ee/ci/yaml/README.html#common-if-clauses-for-rules for other available values
+      when: never
+    - when: always
+
+
+stages:
+  - build
+  - deploy
+  - docs
+  - publish
+
+build:
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+    WINEDEBUG: -all
+  stage: build
+  image: ${CI_REGISTRY_IMAGE}/build:latest
+  script:
+    - xvfb-run wine cmd /c helpers/ninja-build.cmd
+  artifacts:
+    untracked: false
+    paths:
+      - BinOut/
+    expire_in: 1 day
+  rules:
+    - when: always
+
+mkdocs:
+  stage: docs
+  image:
+    name: squidfunk/mkdocs-material:9.5.3
+    entrypoint: [ "" ]
+  script:
+    - mkdocs build -v
+  artifacts:
+    untracked: false
+    paths:
+      - site/
+    expire_in: 1 hour
+  rules:
+    - when: always
+
+doxygen:
+  stage: docs
+  image: ${CI_REGISTRY_IMAGE}/doxygen:latest
+  script:
+    - doxygen
+  artifacts:
+    untracked: false
+    paths:
+      - doxygen/html
+    expire_in: 1 hour
+  rules:
+    - when: always
+
+pages:
+  stage: publish
+  dependencies:
+    - mkdocs
+    - doxygen
+  script:
+    - mv site/ public/
+    - mkdir public/doxygen/
+    - mv doxygen/html/* public/doxygen
+  artifacts:
+    paths:
+      - public/
+    expire_in: 1 day
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - when: never

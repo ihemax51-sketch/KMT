@@ -1,0 +1,22 @@
+{
+  "Address": "127.0.0.1",
+  "Port": 1433,
+  "Username": "sa",
+  "Password": "",
+  "CredentialTarget": "KMTGuard/Sql",
+  "QuickLoginCredentialTarget": "KMTGuard/QuickLoginMasterKey",
+  "ProxyDb": "KMTGuard",
+  "MaximumPool": 256,
+  "MinimumPool": 10,
+  "ConnectionLifetime": 0,
+  "ServerIP": "192.168.1.1",
+  "Language": "English",
+  "UpstreamConnectTimeoutSeconds": 10,
+  "HandshakeTimeoutSeconds": 15,
+  "LoginTimeoutSeconds": 60,
+  "UnauthenticatedIdleTimeoutSeconds": 90,
+  "AuthenticatedHeartbeatTimeoutSeconds": 180,
+  "GatewaySessionCap": 10000,
+  "AgentSessionCap": 10000,
+  "DownloadSessionCap": 2000
+}

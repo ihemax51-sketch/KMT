@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AssemblyName>KMTGuard.Agent</AssemblyName>
+    <ApplicationIcon>..\..\..\KMTGuard.AdminDesktop\Assets\Brand\kmt.ico</ApplicationIcon>
+    <Product>KMTGuard</Product>
+    <Description>KMTGuard Agent Service</Description>
+    <Company>KMT</Company>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <UseAppHost>true</UseAppHost>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <TieredPGO>true</TieredPGO>
+    <DebugType>none</DebugType>
+    <KmtChangelogPath>$(MSBuildThisFileDirectory)..\..\..\CHANGELOG.md</KmtChangelogPath>
+  </PropertyGroup>
+  <Target Name="ValidateRequiredChangelog" BeforeTargets="PrepareForBuild">
+    <Error
+      Condition="!Exists('$(KmtChangelogPath)')"
+      Text="Required project file CHANGELOG.md is missing. KMTGuard.Agent cannot be built without the customer update history." />
+    <ReadLinesFromFile File="$(KmtChangelogPath)">
+      <Output TaskParameter="Lines" ItemName="_KmtChangelogLines" />
+    </ReadLinesFromFile>
+    <Error
+      Condition="'@(_KmtChangelogLines)' == ''"
+      Text="Required project file CHANGELOG.md is empty. Add the customer-facing update history before building KMTGuard.Agent." />
+  </Target>
+  <ItemGroup>
+    <ProjectReference Include="..\KMTGuard\KMTGuard.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="$(KmtChangelogPath)">
+      <Link>CHANGELOG.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="2" />
+  </ItemGroup>
+</Project>

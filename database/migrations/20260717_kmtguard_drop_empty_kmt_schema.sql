@@ -1,0 +1,8 @@
+USE [KMTGuard];
+GO
+
+IF SCHEMA_ID(N'KMT') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM sys.objects WHERE schema_id = SCHEMA_ID(N'KMT'))
+   AND NOT EXISTS (SELECT 1 FROM sys.synonyms WHERE schema_id = SCHEMA_ID(N'KMT'))
+    EXEC(N'DROP SCHEMA [KMT]');
+GO

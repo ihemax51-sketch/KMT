@@ -1,0 +1,128 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Archivos de origen">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Archivos de encabezado">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Archivos de recursos">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AsyncGSCommands.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+	<ClInclude Include="Console\ShardManagerConsole.h">
+	  <Filter>Archivos de encabezado</Filter>
+	</ClInclude>
+	<ClInclude Include="Runtime\CommandDispatchGuard.h">
+	  <Filter>Archivos de encabezado</Filter>
+	</ClInclude>
+	<ClInclude Include="Runtime\ShardManagerRuntimeSafety.h">
+	  <Filter>Archivos de encabezado</Filter>
+	</ClInclude>
+	<ClInclude Include="Runtime\UniqueLogQueue.h">
+	  <Filter>Archivos de encabezado</Filter>
+	</ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\IO\SimpleIni.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Memory\Process.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Memory\hook.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="AsmEdition.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="SettingManagers\Settings.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="SettingManagers\ModuleSettingsManager.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Database\SQLCommand.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Database\SQLConnection.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\BSObj.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\ShardNetManager.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\MsgStreamBuffer.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Memory\MemoryUtility.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Network\MainProcess.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils\Memory\detours.h">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AsyncGSCommands.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+	<ClCompile Include="Console\ShardManagerConsole.cpp">
+	  <Filter>Archivos de origen</Filter>
+	</ClCompile>
+	<ClCompile Include="Runtime\CommandDispatchGuard.cpp">
+	  <Filter>Archivos de origen</Filter>
+	</ClCompile>
+	<ClCompile Include="Runtime\ShardManagerRuntimeSafety.cpp">
+	  <Filter>Archivos de origen</Filter>
+	</ClCompile>
+	<ClCompile Include="Runtime\UniqueLogQueue.cpp">
+	  <Filter>Archivos de origen</Filter>
+	</ClCompile>
+    <ClCompile Include="DllMain.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+	<ClCompile Include="SettingManagers\SettingsSafe.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="SettingManagers\ModuleSettingsManager.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="Database\SQLCommand.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="Database\SQLConnection.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+	<ClCompile Include="Utils\BSObjSafe.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\ShardNetManager.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\MsgStreamBuffer.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="Network\MainProcessSafe.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="vSRO-ShardManager.rc">
+      <Filter>Archivos de recursos</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

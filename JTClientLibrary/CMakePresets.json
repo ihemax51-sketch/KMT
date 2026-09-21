@@ -1,0 +1,49 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 19,
+        "patch": 0
+      },
+    
+    "configurePresets": [
+        {
+            "name": "vc80env",
+            "hidden": true,
+            "environment": {
+                "VSINSTALLDIR": "C:/Program Files (x86)/Microsoft Visual Studio 8",
+                "VCINSTALLDIR": "$env{VSINSTALLDIR}/VC",
+                "FrameworkDir": "C:/Windows/Microsoft.NET/Framework",
+                "FrameworkVersion": "v2.0.50727",
+                "FrameworkSDKDir": "$env{VSINSTALLDIR}/SDK/v2.0",
+                "VisualStudioVersion": "8.0",
+                
+                "DevEnvDir": "$env{VSINSTALLDIR}/Common7/IDE",
+                
+                "PATH": "$env{VSINSTALLDIR}/Common7/IDE;$env{VSINSTALLDIR}/VC/BIN;$env{VSINSTALLDIR}/Common7/Tools;$env{VSINSTALLDIR}/Common7/Tools/bin;$env{VSINSTALLDIR}/VC/PlatformSDK/bin;$env{FrameworkSDKDir}/bin;$env{FrameworkDir}/$env{FrameworkVersion};$env{VSINSTALLDIR}/VC/VCPackages;$penv{PATH}",
+                "INCLUDE": "$env{VSINSTALLDIR}/VC/ATLMFC/INCLUDE;$env{VSINSTALLDIR}/VC/INCLUDE;$env{VSINSTALLDIR}/VC/PlatformSDK/include;$penv{INCLUDE}",
+                "LIB": "$env{VSINSTALLDIR}/VC/ATLMFC/LIB;$env{VSINSTALLDIR}/VC/LIB;$env{VSINSTALLDIR}/VC/PlatformSDK/lib;$env{FrameworkSDKDir}/lib;$penv{LIB}",
+                "LIBPATH": "$env{FrameworkDir}/$env{FrameworkVersion};$env{VSINSTALLDIR}/VC/ATLMFC/LIB"
+            },
+            "vendor": {
+                "jetbrains.com/clion": {
+                    "toolchain": "Visual Studio 2005"
+                }
+            }
+        },{
+            "name": "RelWithDebInfo-cfg",
+            "inherits": "vc80env",
+            "generator": "Ninja",
+            "binaryDir": "cmake-build-relwithdebinfo",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "RelWithDebInfo",
+            "configurePreset": "RelWithDebInfo-cfg"
+        }
+    ]
+}

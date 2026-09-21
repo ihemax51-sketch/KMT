@@ -1,0 +1,629 @@
+﻿English	Turkish
+        Astral Stone	        Astral Taşı
+        Immortal Stone	        Immortal Taşı
+        Lucky Powder	        Şans Tozu
+        Lucky Stone	        Şans Taşı
+        Steady Stone	        Steady Taşı
+    Target Plus	    Hedef Plus
+%d %ls	%d %ls
+%d attempt left	%d deneme kaldı
+%d attempts left	%d deneme kaldı
+%d Days	%d Gün
+%d fps	%d fps
+%d ms	%d ms
+%ldd %ldh %ldm ago	%ldg %ldsa %lddk önce
+%ls (+%d)	%ls (+%d)
+%ls [%d%%]	%ls [%d%%]
+%ls Silk	%ls Silk
+%s  Lv.%u	%s  Sv.%u
+%s challenged you to PvP.	%s sizi PvP düellosuna davet etti.
+%s is currently running an Offline Stall.	%s şu anda bir Çevrimdışı Tezgâh çalıştırıyor.
+[{charname}] has succeeded in augmenting [{wpname}]'s [+{plus}] level with Adv. Elixir.	[{charname}], [{wpname}] eşyasını Gelişmiş İksir ile [+{plus}] seviyesine başarıyla yükseltti.
+[{charname}] has succeeded in augmenting [{wpname}]'s [+{plus}] level.	[{charname}], [{wpname}] eşyasını [+{plus}] seviyesine başarıyla yükseltti.
++ Save	+ Kaydet
+<<Left>>	<<Sol>>
+<Alive>	<Hayatta>
+<Default Color>	<Varsayılan Renk>
+<Killed>	<Öldürüldü>
+<No Guild>	<Guild Yok>
+<No Icon>	<Simge Yok>
+<No Title>	<Unvan Yok>
+<No Union>	<Birlik Yok>
+<None>	<Yok>
+<Unknown>	<Bilinmiyor>
+1 Degrees	1. Derece
+1. Call Shadow Captain Ivy.	1. Shadow Captain Ivy çağır.
+1. Call Shadow Cerberus.	1. Shadow Cerberus çağır.
+1. Call Shadow Isyutaru.	1. Shadow Isyutaru çağır.
+1. Call Shadow Tigerwoman.	1. Shadow Tigerwoman çağır.
+1. Call Shadow Uruchi.	1. Shadow Uruchi çağır.
+1. KMTGuard	1. KMTGuard
+10 Degrees	10. Derece
+11 Degrees	11. Derece
+12 Degrees	12. Derece
+13 Degrees	13. Derece
+14 Degrees	14. Derece
+15 Degrees	15. Derece
+16 Degrees	16. Derece
+17 Degrees	17. Derece
+18 Degrees	18. Derece
+2 Degrees	2. Derece
+2. KMTGuard	2. KMTGuard
+3 Degrees	3. Derece
+3. KMTGuard	3. KMTGuard
+4 Degrees	4. Derece
+4. KMTGuard	4. KMTGuard
+5 Degrees	5. Derece
+5. KMTGuard	5. KMTGuard
+6 Degrees	6. Derece
+6. KMTGuard	6. KMTGuard
+7 Degrees	7. Derece
+7. KMTGuard	7. KMTGuard
+8 Degrees	8. Derece
+8. KMTGuard	8. KMTGuard
+9 Degrees	9. Derece
+Accept	Kabul Et
+Accept join party requests	Partiye katılma isteklerini kabul et
+Accept party invite	Parti davetini kabul et
+Account Register	Hesap Kaydı
+Achievement Center	Başarı Merkezi
+Achievements	Başarımlar
+Achievements :	Başarımlar :
+Acquired Skills	Edinilen Beceriler
+Activate	Etkinleştir
+Activating animation...	Animasyon etkinleştiriliyor...
+Activating Offline Stall...	Çevrimdışı tezgâh etkinleştiriliyor...
+Activating...	Etkinleştiriliyor...
+Activation timed out. Please try again.	Etkinleştirme zaman aşımına uğradı. Lütfen tekrar deneyin.
+Active	Etkin
+Add	Ekle
+Add to List	Listeye Ekle
+Alchemy Macro	Simya Makrosu
+All	Tümü
+Already used this slot.	Bu yuva zaten kullanılıyor.
+Always Active Window	Pencereyi Her Zaman Etkin Tut
+Always Active Window : OFF	Her Zaman Etkin Pencere : KAPALI
+Always Active Window : ON	Her Zaman Etkin Pencere : AÇIK
+An Offline Stall is running for this character.	Bu karakter için bir çevrimdışı tezgâh çalışıyor.
+ANIMATION COLLECTION	ANİMASYON KOLEKSİYONU
+Assign the skills and weapons (shields) to use the skills automatically.	Becerileri otomatik kullanmak için beceri ve silahları (kalkanları) atayın.
+Astral requires an Immortal stone on the item.	Astral için eşya üzerinde Ölümsüzlük taşı gerekir.
+Astral stone is not found.	Astral taşı bulunamadı.
+Attack rate %d	Saldırı oranı %d
+Attack rate +%d	Saldırı oranı +%d
+Attack rate +0	Saldırı oranı +0
+Attendance	Katılım
+Attendance Event	Katılım Etkinliği
+Authenticate	Doğrula
+Auto - Return when HP/MP potion < 10	Otomatik - HP/MP iksiri 10'dan azsa geri dön
+Auto alchemy is working.	Otomatik simya çalışıyor.
+Auto alchemy stopped.	Otomatik simya durdu.
+Auto Equip	Otomatik Kuşan
+Auto Mastery	Otomatik Ustalık
+Auto Order	Otomatik Sırala
+Auto ordering finished...	Otomatik sıralama tamamlandı...
+Auto ordering started...	Otomatik sıralama başladı...
+Auto play and stop when win	Otomatik oyna ve kazanınca dur
+Auto refill magic pop slot	Magic Pop yuvasını otomatik doldur
+Auto reform party	Partiyi otomatik yeniden kur
+Auto Restart	Otomatik Yeniden Başlat
+Auto Skill	Otomatik Beceri
+Auto Sort	Otomatik Düzenle
+Auto sorting finished...	Otomatik düzenleme tamamlandı...
+Auto sorting started...	Otomatik düzenleme başladı...
+Auto-Blue	Otomatik Blue
+Auto-Hunting	Otomatik Av
+Auto-Pick up	Otomatik Toplama
+Auto-Plus	Otomatik Plus
+Auto-Potion	Otomatik İksir
+Auto-Scroll	Otomatik Parşömen
+Auto-Skill	Otomatik Beceri
+Auto-Stat	Otomatik Stat
+Available Colors	Kullanılabilir Renkler
+Available Icons	Kullanılabilir Simgeler
+Available Titles	Kullanılabilir Unvanlar
+Avatar	Avatar
+Awaiting authorization	Onay bekleniyor
+Axe	Balta
+Back	Geri
+Blade	Bıçak
+Block Rate	Blok Oranı
+Blocking rate %d	Blok oranı %d
+Blocking rate +%d	Blok oranı +%d
+Blocking rate +0	Blok oranı +0
+Blue Team	Mavi Takım
+Bow	Yay
+Cancel	İptal
+Cannot choose another teleport method because you are now being teleported.	Şu anda ışınlandığınız için başka bir ışınlanma yöntemi seçemezsiniz.
+CH	CH
+Challenge	Meydan Oku
+Challenge request sent.	Meydan okuma isteği gönderildi.
+Change	Değiştir
+Change Secondary Passcode	İkincil Şifreyi Değiştir
+Change the Grant Name	Verilen Adı Değiştir
+Changelog	Değişiklik Geçmişi
+CHANNEL	KANAL
+Char	Karakter
+Character Name	Karakter Adı
+Character Ranking	Karakter Sıralaması
+Character-bound	Karaktere bağlı
+Check Attribute Stones.	Özellik Taşlarını kontrol edin.
+Check Magic Stones.	Büyü Taşlarını kontrol edin.
+Check the attendance	Katılımı Onayla
+Checking saved account...	Kayıtlı hesap kontrol ediliyor...
+Cleric rod	Rahip asası
+Click the keypad to the right to create a passcode.	Şifre oluşturmak için sağdaki tuş takımını kullanın.
+Close	Kapat
+Code: %d	Kod: %d
+Code: %d\n\nEnter the code within %d seconds.	Kod: %d\n\nKodu %d saniye içinde girin.
+Colors	Renkler
+Configure Attack Skills	Saldırı Becerilerini Ayarla
+Configure Auto-Alchemy	Otomatik Simyayı Ayarla
+Configure Auto-Hunt	Otomatik Avı Ayarla
+Configure Auto-Potion	Otomatik İksiri Ayarla
+Configure Auto-Repair	Otomatik Onarımı Ayarla
+Configure Auto-Resurrect	Otomatik Dirilmeyi Ayarla
+Configure Auto-Return	Otomatik Dönüşü Ayarla
+Configure Auto-Scroll	Otomatik Parşömeni Ayarla
+Configure Auto-Skills	Otomatik Becerileri Ayarla
+Configure Berserk Mode	Berserk Modunu Ayarla
+Configure Buff Skills	Buff Becerilerini Ayarla
+Configure Hunting Range	Av Menzilini Ayarla
+Configure Party Buff Skills	Parti Buff Becerilerini Ayarla
+Configure Pick up Filter	Toplama Filtresini Ayarla
+Configure rewards in KMTGuard database first.	Önce KMTGuard veritabanında ödülleri ayarlayın.
+Configure the auto alchemy.	Otomatik simyayı ayarlayın.
+Configure the auto scroll. Put items to slots for auto use.	Otomatik parşömeni ayarlayın. Otomatik kullanım için eşyaları yuvalara koyun.
+Configure the Pick up Filter for auto pick up.	Otomatik toplama için Toplama Filtresini ayarlayın.
+Confirm	Onayla
+Confirm within %d seconds	%d saniye içinde onaylayın
+Confirmation window	Onay Penceresi
+Congratulations! Your reward was added to the chest.	Tebrikler! Ödülünüz sandığa eklendi.
+Could not find the current client executable.	Geçerli istemci çalıştırılabilir dosyası bulunamadı.
+Could not start the game again.	Oyun yeniden başlatılamadı.
+Create a PvP Wager Challenge	Bahisli PvP Mücadelesi Oluştur
+Create Secondary Passcode	İkincil Şifre Oluştur
+Critical %d	Kritik %d
+Critical +%d	Kritik +%d
+Critical +0	Kritik +0
+Crossbow	Arbalet
+Cure Status	Durum Etkilerini Temizle
+Current Color :	Mevcut Renk:
+Current Title :	Mevcut Unvan:
+Current Title : 	Mevcut Unvan: 
+Dagger	Hançer
+Dark staff	Kara asa
+Date	Tarih
+Decline	Reddet
+Default	Varsayılan
+Degrees	Dereceler
+Delete	Sil
+Descriptions	Açıklamalar
+Devil's Spirit	Şeytan Ruhu
+Disconnect	Bağlantıyı Kes
+Disconnect it and login normally?	Bağlantı kesilip normal giriş yapılsın mı?
+Disconnecting Offline Stall...	Çevrimdışı tezgâhın bağlantısı kesiliyor...
+Do you recall to auto equip?	Otomatik kuşanmayı geri çağırmak istiyor musunuz?
+Do you want close client?	Oyunu kapatmak istiyor musunuz?
+Do you want visit official Discord Channel?	Resmî Discord kanalını ziyaret etmek istiyor musunuz?
+Do you want visit official Facebook Site?	Resmî Facebook sayfasını ziyaret etmek istiyor musunuz?
+Do you want visit official Web Site?	Resmî web sitesini ziyaret etmek istiyor musunuz?
+Dont Attack the Monsters	Canavarlara Saldırma
+Dont pick up alchemy materials	Simya malzemelerini toplama
+Dont pick up Alchemy stones	Simya taşlarını toplama
+Dont pick up Alchemy tablets	Simya tabletlerini toplama
+Dont pick up Arrow/bolts	Okları toplama
+Dont pick up Elixirs	Elixirleri toplama
+Dont pick up Golds	Altını toplama
+Dont pick up HP / MP potions	HP / MP iksirlerini toplama
+Dont pick up Special Return scrolls	Özel dönüş parşömenlerini toplama
+Dont pick up Vigor potions	Vigor iksirlerini toplama
+Dou you want teleport?	Işınlanmak istiyor musunuz?
+DPS	Dps Meter
+Drop Logs	Düşen Eşya Kayıtları
+Durability %d	Dayanıklılık %d
+Durability +%d	Dayanıklılık +%d
+Durability +0	Dayanıklılık +0
+Dynamic Ranking	Dinamik Sıralama
+E - Mail	E-posta
+Elapsed Time	Geçen Süre
+Electric	Elektrik
+Elixir is not found.	İksir bulunamadı.
+Emoji list	Emoji listesi
+Enable HUD	HUD'u Etkinleştir
+Enable Infinity Zoom	Sınırsız Yakınlaştırmayı Etkinleştir
+Enter a valid wager.	Geçerli bir bahis girin.
+Enter opponent name.	Rakibin adını girin.
+ENTER SEAL	MÜHRÜ GİRİN
+Enter Secondary Passcode	İkincil Şifreyi Girin
+Enter the character name.	Karakter adını girin.
+Enter the code within %d seconds.	Kodu %d saniye içinde girin.
+Enter the complete four-digit seal.	Dört haneli mührü eksiksiz girin.
+Enter the grant name	Yetki adını girin
+Enter the new Item Mall	Yeni Item Mall'a Gir
+Enter the opponent character and the gold wager amount.	Rakip karakteri ve altın bahis miktarını girin.
+Enter the verification code using the keypad.	Doğrulama kodunu tuş takımıyla girin.
+EU	EU
+Event Name	Etkinlik Adı
+Event Register	Etkinlik Kaydı
+Event Schedule	Etkinlik Takvimi
+Event Scheduling	Etkinlik Takvimi
+Exchange function is not work for this item.	Değiştirme işlevi bu eşyada kullanılamaz.
+Exchange function is work only weapons.	Değiştirme işlevi yalnızca silahlarda kullanılabilir.
+Exchange Item Window	Eşya Değiştirme Penceresi
+Exp Free / Item Free	EXP Serbest / Eşya Serbest
+Exp Free / Item Share	EXP Serbest / Eşya Paylaşımlı
+Exp Share / Item Free	EXP Paylaşımlı / Eşya Serbest
+Exp Share / Item Share	EXP Paylaşımlı / Eşya Paylaşımlı
+EXPIRES %02d:%02d	SÜRE SONU %02d:%02d
+EXPIRES 01:00	SÜRE 01:00
+Expires in %d seconds	%d saniye içinde sona erer
+Extend Background Limit : OFF	Arka Plan Sınırını Genişlet : KAPALI
+Extend Background Limit : ON	Arka Plan Sınırını Genişlet : AÇIK
+Failed to load drop logs	Düşen eşya kayıtları yüklenemedi
+Favorites	Favoriler
+Filter	Filtre
+For open hunting on the Silkroad!	Silkroad'da otomatik ava başlamak için!
+FOR SALE	SATILIK
+From	Gönderen
+General	Genel
+Giant	Dev
+Glavie	Glaive
+Glow Type	Parlama Türü
+Go Offline	Çevrimdışı Ol
+Gold	Altın
+Gold amount is not enough for equip translation.	Eşya değiştirme için yeterli Altın yok.
+Gold Wager Amount	Altın Bahis Miktarı
+GOODS RELEASE CODE	MAL SERBEST BIRAKMA KODU
+Grant name must be consist min 2 characters.	Verilen ad en az 2 karakterden oluşmalıdır.
+Grant name must consist 2~12 English letters.	Verilen ad 2-12 İngilizce harften oluşmalıdır.
+Green Team	Yeşil Takım
+Guild	Lonca
+Harp	Arp
+Hide item informations	Eşya bilgilerini gizle
+History : - %ls Silk	Geçmiş : - %ls Silk
+Hold on. The wheel is slowing down.	Bekleyin. Çark yavaşlıyor.
+HP	HP
+Hungury	Açlık
+Hunter	Avcı
+Icon Manager	Simge Yöneticisi
+ID must be 4-16 characters.	ID 4-16 karakter olmalıdır.
+ignore ????????????? %d	yoksay ????????????? %d
+Immortal stone is not found.	Ölümsüzlük taşı bulunamadı.
+In %ldd %ldh %ldm %lds	%ldg %ldsa %lddk %ldsn içinde
+In 1 hour	1 saat içinde
+In 10 hours	10 saat içinde
+In 24 hours	24 saat içinde
+In 3 hours	3 saat içinde
+In 5 hours	5 saat içinde
+Incoming PvP Challenge	Gelen PvP Meydan Okuması
+Incorrect seal. A new code was issued.	Yanlış mühür. Yeni bir kod verildi.
+Infinity Zoom : OFF	Sonsuz Yakınlaştırma : KAPALI
+Infinity Zoom : ON	Sonsuz Yakınlaştırma : AÇIK
+Info	Bilgi
+Int	INT
+Invalid passcode. If you enter the wrong passcode more than six times, you will be locked out for 60 minutes.	Geçersiz şifre. Yanlış şifreyi altı defadan fazla girerseniz 60 dakika boyunca kilitlenirsiniz.
+INVENTORY VAULT	ENVANTER KASASI
+Invite to Party	Partiye Davet Et
+Item	Eşya
+Item Chest	Eşya Sandığı
+Item Chest data was incomplete. Please reopen the chest.	Eşya Sandığı verisi eksik geldi. Lütfen sandığı yeniden açın.
+Item Chest request timed out. Reopen the chest before trying again.	Eşya Sandığı isteği zaman aşımına uğradı. Tekrar denemeden önce sandığı yeniden açın.
+Item Info	Eşya Bilgisi
+Item Points	Eşya Puanı
+ITEM POWER	EŞYA GÜCÜ
+Item reached the target plus.	Eşya hedef artı seviyesine ulaştı.
+Items	Eşyalar
+Job is completed.	İşlem tamamlandı.
+Keep this stall selling after you close the client?	Oyunu kapattıktan sonra bu tezgâh satışa devam etsin mi?
+Kill	Öldürme
+Killer	Öldüren
+Killer Animation Studio	Öldürme Animasyonu Stüdyosu
+Killer Animations	Öldürme Animasyonları
+LIMITED EDITION OFFERS	SINIRLI SÜRÜM TEKLİFLERİ
+LIVE CHARACTER PREVIEW	CANLI KARAKTER ÖNİZLEMESİ
+LIVE EQUIPMENT CHAMBER	CANLI EKİPMAN BÖLMESİ
+Loading web page...	Web sayfası yükleniyor...
+Loading...	Yükleniyor...
+Location	Konum
+Lock Item	Eşyayı Kilitle
+Log	Kayıt
+Lucky powder is not found.	Şans tozu bulunamadı.
+Lucky rewards	Şans ödülleri
+Lucky Spin	Şans Çarkı
+Lucky stone is not found.	Şans taşı bulunamadı.
+Lv.	Sv.
+Lv. %d	Sv. %d
+Mag. absorption %.1f	Büyü emilimi %.1f
+Mag. absorption +%.1f	Büyü emilimi +%.1f
+Mag. absorption +0	Büyü emilimi +0
+Mag. atk. pwr. %d ~ %d	Büyü saldırı gücü %d ~ %d
+Mag. atk. pwr. %d ~ +%d	Büyü saldırı gücü %d ~ +%d
+Mag. atk. pwr. +%d ~ %d	Büyü saldırı gücü +%d ~ %d
+Mag. atk. pwr. +%d ~ +%d	Büyü saldırı gücü +%d ~ +%d
+Mag. atk. pwr. +0 ~ +0	Büyü saldırı gücü +0 ~ +0
+Mag. def. pwr. %.1f	Büyü savunma gücü %.1f
+Mag. def. pwr. +%.1f	Büyü savunma gücü +%.1f
+Mag. def. pwr. +0	Büyü savunma gücü +0
+Mag. reinforce %.1f%% ~ %.1f%%	Büyü takviyesi %.1f%% ~ %.1f%%
+Mag. reinforce %.1f%% ~ +%.1f%%	Büyü takviyesi %.1f%% ~ +%.1f%%
+Mag. reinforce +%.1f%% ~ %.1f%%	Büyü takviyesi +%.1f%% ~ %.1f%%
+Mag. reinforce +%.1f%% ~ +%.1f%%	Büyü takviyesi +%.1f%% ~ +%.1f%%
+Mag. reinforce +0%% ~ +0%%	Büyü takviyesi +0%% ~ +0%%
+Mag. reinforce. %.1f%%	Büyü takviyesi %.1f%%
+Mag. reinforce. +%.1f%%	Büyü takviyesi +%.1f%%
+Mag. reinforce. +0%%	Büyü takviyesi +0%%
+Magical Absortion	Büyü Emilimi
+Magical Attack Power	Büyü Saldırı Gücü
+Magical Defense	Büyü Savunması
+Magical Reinforce	Büyü Takviyesi
+Manage	Yönet
+Map Location	Harita Konumu
+Market	Pazar
+Max level of the current server is %d.	Mevcut sunucunun maksimum seviyesi %d.
+Maximum character member can be add to list.	Listeye eklenebilecek en fazla karakter sayısına ulaşıldı.
+Menu	Menü
+Model Type	Model Türü
+Monster	Canavar
+Move	Taşı
+Move to party member.	Parti üyesine git.
+Move to the location to hunt in and run Auto-Hunt to begin hunting automatically.	Avlanmak istediğiniz yere gidin ve otomatik ava başlamak için Otomatik Av'ı çalıştırın.
+Move to the user's set location.	Kayıtlı konuma git.
+MP	MP
+Name	Ad
+New Item Mall	Yeni Item Mall
+No achievements are available in this category.	Bu kategoride kullanılabilir başarım yok.
+No drop logs found	Düşen eşya kaydı bulunamadı
+No rewards configured yet.	Henüz ödül ayarlanmamış.
+No saved accounts yet.	Henüz kayıtlı hesap yok.
+No special offers configured yet.	Henüz özel teklif ayarlanmamış.
+No.	No.
+None	Yok
+NUMBER OF ATTENDED DAYS	KATILIM SAĞLANAN GÜN SAYISI
+Offer price  %d %ls	Teklif fiyatı  %d %ls
+Offline Ready	Çevrimdışı Kullanıma Hazır
+Offline Stall	Çevrimdışı Tezgâh
+Offline Stall activated. You may close the client.	Çevrimdışı Tezgâh etkinleştirildi. İstemciyi kapatabilirsiniz.
+Offline Stall activation failed.	Çevrimdışı Tezgâh etkinleştirilemedi.
+Onehand sword	Tek elli kılıç
+Only from list	Yalnızca listeden
+Only party master can be call shadow uniques.	Shadow Unique'leri yalnızca parti lideri çağırabilir.
+Open the stall before activating Offline Stall.	Çevrimdışı Tezgâhı etkinleştirmeden önce tezgâhı açın.
+Opponent Character	Rakip Karakter
+Options	Seçenekler
+Original	Orijinal
+Other players can show your items!	Diğer oyuncular eşyalarınızı görebilir!
+Other players cannot show your items anymore!	Diğer oyuncular artık eşyalarınızı göremez!
+Owned	Sahip Olunan
+Page	Sayfa
+Page %d / %d	Sayfa %d / %d
+Page 1 / 1	Sayfa 1 / 1
+Parry rate %d	Kaçınma oranı %d
+Parry rate +%d	Kaçınma oranı +%d
+Parry rate +0	Kaçınma oranı +0
+Party	Parti
+Password	Şifre
+Password : 	Şifre: 
+Password changed succesfully. Enter the new passcode.	Şifre başarıyla değiştirildi. Yeni şifreyi girin.
+Password confirmation does not match.	Şifre doğrulaması eşleşmiyor.
+Password created succesfully. Click the keypad to the right to create a passcode.	Şifre başarıyla oluşturuldu. Şifre oluşturmak için sağdaki tuş takımını kullanın.
+Password must be 6-32 characters.	Şifre 6-32 karakter olmalıdır.
+Passwords doesnt match.	Şifreler eşleşmiyor.
+Pet	Pet
+Pet Filter	Pet Filtresi
+Pet2 Skills	Pet2 Becerileri
+Phy Absortion	Fiziksel Emilim
+Phy. absorption %.1f	Fiziksel emilim %.1f
+Phy. absorption +%.1f	Fiziksel emilim +%.1f
+Phy. absorption +0	Fiziksel emilim +0
+Phy. atk. pwr. %d ~ %d	Fiziksel saldırı gücü %d ~ %d
+Phy. atk. pwr. %d ~ +%d	Fiziksel saldırı gücü %d ~ +%d
+Phy. atk. pwr. +%d ~ %d	Fiziksel saldırı gücü +%d ~ %d
+Phy. atk. pwr. +%d ~ +%d	Fiziksel saldırı gücü +%d ~ +%d
+Phy. atk. pwr. +0 ~ +0	Fiziksel saldırı gücü +0 ~ +0
+Phy. def. pwr. %.1f	Fiziksel savunma gücü %.1f
+Phy. def. pwr. +%.1f	Fiziksel savunma gücü +%.1f
+Phy. def. pwr. +0	Fiziksel savunma gücü +0
+Phy. reinforce %.1f%% ~ %.1f%%	Fiziksel takviye %.1f%% ~ %.1f%%
+Phy. reinforce %.1f%% ~ +%.1f%%	Fiziksel takviye %.1f%% ~ +%.1f%%
+Phy. reinforce +%.1f%% ~ %.1f%%	Fiziksel takviye +%.1f%% ~ %.1f%%
+Phy. reinforce +%.1f%% ~ +%.1f%%	Fiziksel takviye +%.1f%% ~ +%.1f%%
+Phy. reinforce +0%% ~ +0%%	Fiziksel takviye +0%% ~ +0%%
+Phy. reinforce. %.1f%%	Fiziksel takviye %.1f%%
+Phy. reinforce. +%.1f%%	Fiziksel takviye +%.1f%%
+Phy. reinforce. +0%%	Fiziksel takviye +0%%
+Physical Attack Power	Fiziksel Saldırı Gücü
+Physical Defense	Fiziksel Savunma
+Physical Reinforce	Fiziksel Takviye
+Pick Inventory (%d Items)	Toplama Envanteri (%d Eşya)
+Pick Inventory (O)	Toplama Envanteri (O)
+Pick up items with Character	Eşyaları karakterle topla
+Pick up items with Grap Pet	Eşyaları toplama petiyle topla
+Pick up only Rare equips	Yalnızca nadir ekipmanları topla
+Play	Oyna
+Play price: %d %ls	Oynama ücreti: %d %ls
+Player	Oyuncu
+Please check your item or stones.	Lütfen eşyanızı veya taşlarınızı kontrol edin.
+Please enter character name first.	Lütfen önce karakter adını girin.
+Please enter username and password first.	Lütfen önce kullanıcı adını ve şifreyi girin.
+Please put an item in the slot.	Lütfen yuvaya bir eşya koyun.
+Please select a drop log first.	Lütfen önce bir düşen eşya kaydı seçin.
+Please select a monster first.	Lütfen önce bir canavar seçin.
+Please select target attributes.	Lütfen hedef özellikleri seçin.
+Please select target blues.	Lütfen hedef mavileri seçin.
+Plus	Plus
+Points	Puan
+Poison	Zehir
+Popular Items	Popüler Eşyalar
+Possible Drops	Olası Düşenler
+Possible Drops - %ls (%d Items)	Olası Düşenler - %ls (%d Eşya)
+Possible Drops - Failed	Olası Düşenler - Başarısız
+Possible Drops - Loading...	Olası Düşenler - Yükleniyor...
+Preparing the wheel...	Çark hazırlanıyor...
+Press Lucky Spin to try your luck.	Şansınızı denemek için Şans Çarkı'na basın.
+Preview	Önizleme
+Purchase	Satın Al
+Purchase All	Tümünü Satın Al
+Purchase List	Satın Alma Listesi
+Purchase request timed out. Please try again.	Satın alma isteği zaman aşımına uğradı. Lütfen tekrar deneyin.
+Purification Pill	Arındırma Hapı
+Put a item and enhancer first.	Önce bir eşya ve güçlendirici yerleştirin.
+PvP Challenge	PvP Meydan Okuması
+PvP Challenge is disabled.	PvP Meydan Okuması devre dışı.
+Qty.	Adet
+R. Password : 	Şifre Tekrarı: 
+Rank Type :	Sıralama Türü:
+Reach to Stat	Hedef Özelliğe Ulaş
+Readied Skills	Hazır Beceriler
+Ready	Hazır
+Ready to activate.	Etkinleştirmeye hazır.
+Receive	Al
+Red Team	Kırmızı Takım
+Refresh	Yenile
+Register	Kaydol
+Register request sent.	Kayıt isteği gönderildi.
+Regular price  %d	Normal fiyat  %d
+Remaining time	Kalan süre
+Remaining time          %02d:%02d	Kalan süre          %02d:%02d
+Remaining time          03:00	Kalan süre          03:00
+Remember this PC.	Bu bilgisayarı hatırla.
+Remove	Kaldır
+Remove Title	Unvanı Kaldır
+Request timed out. Please try again.	İstek zaman aşımına uğradı. Lütfen tekrar deneyin.
+Required pet level is %d.	Gerekli pet seviyesi %d.
+Restart failed	Yeniden başlatma başarısız
+Result	Sonuç
+Resurrect	Dirilt
+Resurrect in town	Şehirde diril
+Resurrect Party Members	Parti Üyelerini Dirilt
+Reward	Ödül
+Rewards are delivered directly to chest.	Ödüller doğrudan sandığa teslim edilir.
+Save	Kaydet
+Save and move to your desired location.	İstediğiniz konumu kaydedip oraya gidin.
+Saved account removed locally.	Kayıtlı hesap bu bilgisayardan silindi.
+Saved Accounts	Kayıtlı Hesaplar
+Saved login token cannot be opened on this Windows user.	Kayıtlı giriş anahtarı bu Windows kullanıcısında açılamıyor.
+Saved quick login character is pending deletion.	Kayıtlı hızlı giriş karakteri silinmeyi bekliyor.
+Saved quick login character was not found on this account.	Kayıtlı hızlı giriş karakteri bu hesapta bulunamadı.
+Saving character login securely...	Karakter girişi güvenli biçimde kaydediliyor...
+Seal expired. Sell the goods again.	Mührün süresi doldu. Malları tekrar satışa koyun.
+Search	Ara
+Secondary passcode has been entered succesfully.	İkincil şifre başarıyla girildi.
+Secondary Password (Remember PC)	İkincil Şifre (Bilgisayarı Hatırla)
+Secure Trade Authorization	Güvenli Ticaret Onayı
+Select	Seç
+Select an achievement to view its requirements and reward.	Gereksinimlerini ve ödülünü görmek için bir başarım seçin.
+Select an animation	Bir animasyon seçin
+Sending purchase request...	Satın alma isteği gönderiliyor...
+Set the % of the HP/Hunger gauge to the desired level to use potions automatically when the gauge reaches that level.  Uncheck any checkbox for the parameter for which you wish to disable the trigger.	HP/Açlık göstergesi belirlediğiniz seviyeye ulaştığında iksirleri otomatik kullanmak için yüzdeyi ayarlayın. Devre dışı bırakmak istediğiniz parametrenin işaretini kaldırın.
+Set the % of the HP/MP gauge to the desired level to use potions automatically when the gauge reaches that level.  Uncheck any checkbox for the parameter for which you wish to disable the trigger.	HP/MP göstergesi belirlediğiniz seviyeye ulaştığında iksirleri otomatik kullanmak için yüzdeyi ayarlayın. Devre dışı bırakmak istediğiniz parametrenin işaretini kaldırın.
+Set the % of the Vigor HP/MP gauge to the desired level to use potions automatically when the gauge reaches that level.  Uncheck any checkbox for the parameter for which you wish to disable the trigger.	Vigor HP/MP göstergesi belirlediğiniz seviyeye ulaştığında iksirleri otomatik kullanmak için yüzdeyi ayarlayın. Devre dışı bırakmak istediğiniz parametrenin işaretini kaldırın.
+Settings	Ayarlar
+Shield	Kalkan
+Show Fps/Ping Window	FPS/Ping Penceresini Göster
+Show Second Bar	İkinci Çubuğu Göster
+Silk %s	Silk %s
+Silk : %ls	Silk : %ls
+Silk amount is not enough for equip translation.	Eşya değiştirme için yeterli Silk yok.
+Silk Charge	Silk Yükle
+Silk Rank :	Silk Sıralaması:
+Skills to Use	Kullanılacak Beceriler
+Someone	Bir oyuncu
+Spear	Mızrak
+Special Offer	Özel Teklif
+Special Offers	Özel Teklifler
+Special Offers is currently disabled.	Özel Teklifler şu anda devre dışı.
+Speed Drug	Hız İksiri
+SPIN	ÇEVİR
+Spin request timed out. Please try again.	Çevirme isteği zaman aşımına uğradı. Lütfen tekrar deneyin.
+SRO Macro	SRO Makro
+Start	Başlat
+Status	Durum
+Steady stone is not found.	Steady taşı bulunamadı.
+Stop	Durdur
+Str	STR
+Summon Trigger	Çağırma Tetikleyicisi
+Sword	Kılıç
+Take All	Tümünü Al
+Target value must be between 1 and 100.	Hedef değer 1 ile 100 arasında olmalıdır.
+The alchemy server did not respond. Auto alchemy stopped.	Simya sunucusu yanıt vermedi. Otomatik simya durduruldu.
+The code must consist minimum 6 numbers.	Kod en az 6 rakamdan oluşmalıdır.
+The code must consist of minimum 6 numbers.	Kod en az 6 rakamdan oluşmalıdır.
+The enhancement level on the equipment is gone [-1], because the alchemy enhancement failed.	Simya güçlendirmesi başarısız olduğu için ekipmanın güçlendirme seviyesi düştü [-1].
+The enhancement stopped. Check your items	Güçlendirme durdu. Eşyalarınızı kontrol edin.
+The item cannot be used on wrong object.	Eşya yanlış hedefte kullanılamaz.
+The passcode must be between 6-8 digits.	Şifre 6-8 rakamdan oluşmalıdır.
+The selected item is no longer available. Auto alchemy stopped.	Seçilen eşya artık mevcut değil. Otomatik simya durduruldu.
+The selected item was removed. Auto alchemy stopped.	Seçilen eşya kaldırıldı. Otomatik simya durduruldu.
+The target character is hide self items.	Hedef karakter ekipmanlarını gizliyor.
+The wheel is spinning...	Çark dönüyor...
+The wheel will stop on your selected reward.	Çark seçtiğiniz ödülde duracak.
+These item mall windows are designed and added by own for you valuable players.	Bu Item Mall pencereleri değerli oyuncularımız için özel olarak tasarlanıp eklendi.
+This character	Bu karakter
+This item is not locked.  Use a locked item.	Bu eşya kilitli değil. Kilitli bir eşya kullanın.
+This party member is already added to list.	Bu parti üyesi listeye zaten eklendi.
+This place for a SoX item.	Bu alan SoX eşyası içindir.
+This purchase cannot complete due to insufficient silks.	Yetersiz Silk nedeniyle satın alma tamamlanamadı.
+Time's up!	Süre doldu!
+Title Manager	Unvan Yöneticisi
+Title Name	Unvan Adı
+Titles	Unvanlar
+Total: %d	Toplam: %d
+Total: 0	Toplam: 0
+TRADE AUTHORIZATION SEAL	TİCARET ONAY MÜHRÜ
+Trade goods verification required.	Ticaret malları doğrulaması gerekli.
+Trade Verification	Ticaret Doğrulaması
+Twohand staff	İki elli asa
+Twohand sword	İki elli kılıç
+Type	Tür
+Unable to find Magic Proof Stone in Alchemy Window. When the reinforcement is failed, both the equipment and the Enhancer are destroyed.	Simya Penceresinde Magic Proof Stone bulunamadı. Güçlendirme başarısız olursa hem ekipman hem de güçlendirici yok edilir.
+Unable to load item details.	Eşya ayrıntıları yüklenemedi.
+Union	Birlik
+Unique History	Unique Geçmişi
+Unique Logs	Unique Kayıtları
+Unique Skills	Unique Becerileri
+Unique Target	Unique Hedefi
+Universal Pill	Evrensel Hap
+Unlock Item	Eşyanın Kilidini Aç
+Use Devil/Angel Spirit's	Devil/Angel Spirit Kullan
+Use Devil/Angel Spirit's Ignore Skill	Devil/Angel Spirit Ignore Skill Kullan
+Use Res. Scroll	Dirilme Parşömeni Kullan
+Use Title	Unvanı Kullan
+Verify	Doğrula
+View	Görüntüle
+Vigor	Vigor
+Vigor (HP)	Vigor (HP)
+Vigor (MP)	Vigor (MP)
+Wager: %I64d Gold	Bahis: %I64d Altın
+Wait for resurrection	Dirilmeyi bekle
+Waiting for KMTGuard to select the reward.	KMTGuard'ın ödülü seçmesi bekleniyor.
+Weapon	Silah
+Web Viewer	Web Görüntüleyici
+WebView2 failed. Check WebViewerBridge.dll / runtime.	WebView2 başarısız. WebViewerBridge.dll dosyasını / çalışma zamanını kontrol edin.
+West	Batı
+When an item is locked, it cannot be traded, dropped, stored, sold at a shop, or registered at a street shop.  It can only be unlocked with a key.	Bir eşya kilitlendiğinde takas edilemez, yere atılamaz, depoya konamaz, dükkâna satılamaz veya tezgahta satışa konamaz. Yalnızca anahtarla kilidi açılabilir.
+When you agree to use the function, the area of expertise that is open in the skill window will be opened automatically. This function does not run in the background. Do you approve?	Bu işlevi kabul ettiğinizde beceri penceresinde açık olan uzmanlık alanı otomatik olarak geliştirilecektir. Bu işlev arka planda çalışmaz. Onaylıyor musunuz?
+When you agree to use the function, the skills in the field of expertise that are open in the skill window will be openedautomatically. This function does not run in the background. Do you approve?	Bu işlevi kabul ettiğinizde beceri penceresinde açık olan uzmanlık alanındaki beceriler otomatik olarak geliştirilecektir. Bu işlev arka planda çalışmaz. Onaylıyor musunuz?
+When you agree to use the function, your stat points will be given as int. This function continues to run in the background. Do you approve?	Bu işlevi kabul ettiğinizde stat puanlarınız INT olarak dağıtılacaktır. Bu işlev arka planda çalışmaya devam eder. Onaylıyor musunuz?
+When you agree to use the function, your stat points will be given as str. This function continues to run in the background. Do you approve?	Bu işlevi kabul ettiğinizde stat puanlarınız STR olarak dağıtılacaktır. Bu işlev arka planda çalışmaya devam eder. Onaylıyor musunuz?
+White Team	Beyaz Takım
+Windows failed to protect the token. Account was not saved locally.	Windows giriş anahtarını koruyamadı. Hesap bu bilgisayara kaydedilmedi.
+Winner selected. Open chest to claim your prize.	Kazanan seçildi. Ödülünüzü almak için sandığı açın.
+You allowed only one item for link.	Bağlantı için yalnızca bir eşyaya izin verilir.
+You can put a magic proof stone.	Bir Magic Proof Stone koyabilirsiniz.
+You cannot proceed this action on a locked item.	Bu işlemi kilitli bir eşyada yapamazsınız.
+You cannot proceed this action on a unlocked item.	Bu işlemi kilitsiz bir eşyada yapamazsınız.
+you can't attack [ int uniques ]	[ INT unique ] hedeflerine saldıramazsınız
+you can't attack [ str uniques ]	[ STR unique ] hedeflerine saldıramazsınız
+you must be in a guild to attack this unique	Bu unique hedefe saldırmak için bir loncada olmalısınız
+you must be in a party to attack this unique	Bu unique hedefe saldırmak için bir partide olmalısınız
+you must be on Job to attack this unique	Bu unique hedefe saldırmak için Job durumunda olmalısınız
+You must enter the guild.	Guild adını girmelisiniz.
+you must remove Job suit to attack this unique	Bu unique hedefe saldırmak için Job kıyafetini çıkarmalısınız
+You my put a magic proof stone.	Bir Magic Proof Stone koymalısınız.
+You will create a secondary passcode for further protection of your account.	Hesabınızı daha iyi korumak için ikincil bir şifre oluşturacaksınız.
+your cape is not allowed for this unique	Pelerininiz bu unique hedef için uygun değil
+Your character will remain in game as a protected stall.	Karakteriniz korumalı bir tezgâh olarak oyunda kalacak.
+your Job type is not allowed for this unique	Job türünüz bu unique hedef için uygun değil
+your race is not allowed for this unique	Irkınız bu unique hedef için uygun değil
+You're cannot save special regions.	Özel bölgelerde konum kaydedemezsiniz.

@@ -1,0 +1,26 @@
+option(CONFIG_IMGUI "Enable ImGui" OFF)
+if (CONFIG_IMGUI)
+    add_definitions(-DCONFIG_IMGUI)
+endif()
+
+option(CONFIG_DEBUG_REDIRECT_PUTDUMP "Redirect the PutDump output to the console" OFF)
+if (CONFIG_DEBUG_REDIRECT_PUTDUMP)
+    add_definitions(-DCONFIG_DEBUG_REDIRECT_PUTDUMP)
+endif()
+
+option(CONFIG_DEBUG_CONSOLE "Show the debug console" ON)
+if (CONFIG_DEBUG_CONSOLE)
+    add_definitions(-DCONFIG_DEBUG_CONSOLE)
+endif()
+
+option(CONFIG_DEBUG_MSG_RECEIVE "Print packets debug messages on receive" ON)
+if (CONFIG_DEBUG_MSG_RECEIVE)
+    add_definitions(-DCONFIG_DEBUG_MSG_RECEIVE)
+endif()
+
+option(__SR_VIETNAM_SERVICE__ "" ON)
+if(__SR_VIETNAM_SERVICE__)
+    add_definitions(-D__SR_VIETNAM_SERVICE__)
+    set(BUILD_SERVICE_TYPE "__SR_VIETNAM_SERVICE__")
+    message("## SERVICE DEFINE APPLIED :_ SR_VIETNAM_SERVICE _")
+endif()
