@@ -4,6 +4,12 @@
 
 Release date: 2026-09-21
 
+### Client DLL deep audit - 2026-09-21 (developer documentation)
+
+- Completed a new independent source audit of the current Client DLL baseline, including startup, hooks, native object lifetimes, DirectX 9, custom interfaces, automation, packets, memory, threads, performance, and loader compatibility.
+- Documented a prioritized Windows staging plan and compatibility-focused recommendations without changing live Client DLL behavior, packets, media, or server systems.
+- Requirement: no server restart, Filter restart, SQL update, Client DLL replacement, media update, or additional customer action is required.
+
 - Consolidated KMTGuard into one complete edition containing the Filter, Admin Desktop, Client DLL, media, GameServer add-on, ShardManager add-on, and all existing feature packages.
 - Removed edition-specific activation, subscription, remote validation, machine/IP binding, player-cap enforcement, and separate package generation requirements.
 - Added one full-build command plus a component build command, both publishing to the single `D:\KMTGuard-build` delivery tree with SHA-256 verification.
