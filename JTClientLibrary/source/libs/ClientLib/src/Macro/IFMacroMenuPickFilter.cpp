@@ -3,6 +3,7 @@
 //
 
 #include "IFMacroMenuPickFilter.h"
+#include <support/SafePath.h>
 #include "Game.h"
 #include "IFMacroMenu.h"
 #include <BSLib/Debug.h>
@@ -280,11 +281,13 @@ bool CIFMacroMenuPickFilter::OnCreate(long ln) {
 
 void CIFMacroMenuPickFilter::SaveButton(){
     char settingDirectory[MAX_PATH];
-    sprintf(settingDirectory, "%s\\Setting", theApp.GetWorkingDir());
+    if (!KmtFormatPath(settingDirectory, sizeof(settingDirectory), "%s\\Setting", theApp.GetWorkingDir()))
+        return;
     CreateDirectoryA(settingDirectory, NULL);
 
     char buffer3[0x200];
-    sprintf(buffer3, "%s\\Setting\\%ls_PickupFilter.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str());
+    if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_PickupFilter.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+        return;
 
 // Dosyayı yazma modunda aç
     FILE *file3 = fopen(buffer3, "w");

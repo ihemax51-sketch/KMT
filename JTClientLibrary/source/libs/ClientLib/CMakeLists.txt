@@ -2,6 +2,14 @@ add_library(ClientLib STATIC ${SOURCE_FILES} src/CustomInterface/IFJobCounter.cp
 
 set(KMT_DESKTOP_HUD_OBJECT
         "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/DesktopCharacterHud.vc80.obj")
+set(KMT_DESKTOP_HUD_SHA256
+        "b0f51f4b34c687f096ff81108d4a2d32681c63cec4bd19ddc4d2d23d8956f54a")
+file(SHA256 "${KMT_DESKTOP_HUD_OBJECT}" KMT_DESKTOP_HUD_ACTUAL_SHA256)
+if (NOT KMT_DESKTOP_HUD_ACTUAL_SHA256 STREQUAL KMT_DESKTOP_HUD_SHA256)
+    message(FATAL_ERROR
+            "DesktopCharacterHud.vc80.obj hash mismatch; refusing an unreviewed prebuilt HUD object")
+endif ()
+message(STATUS "Verified DesktopCharacterHud.vc80.obj SHA-256=${KMT_DESKTOP_HUD_ACTUAL_SHA256}")
 set_source_files_properties(${KMT_DESKTOP_HUD_OBJECT}
         PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 target_sources(ClientLib PRIVATE ${KMT_DESKTOP_HUD_OBJECT})

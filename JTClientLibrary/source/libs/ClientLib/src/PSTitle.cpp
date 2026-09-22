@@ -1111,6 +1111,15 @@ bool CPSTitle::OnServerPacketRecv(CMsgStreamBuffer *msg) {
         msg->m_currentReadBytes = 0;
     }
     else if (msg->msgid() == 0x1210) {
+        // This legacy configuration layout is variable-length. Reject packets
+        // that cannot contain its fixed prefix before any settings, UI access,
+        // or compatibility patch is touched. Full field migration remains
+        // tracked in the repair report because native string reads need a
+        // protocol-by-protocol conversion to SafePacketReader.
+        if (msg->Remaining() < 48 || msg->Remaining() > 0x10000) {
+            msg->FlushRemaining();
+            return false;
+        }
         //if (g_CGame->langId == 2) {
         //    const wchar_t *msg = L"Bu sunucu Lexa Shield tarafından korunmaktadır.";
         //    this->ShowMessage(msg, 0x87ceeb);

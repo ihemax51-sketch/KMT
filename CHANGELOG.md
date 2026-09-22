@@ -4,6 +4,13 @@
 
 Release date: 2026-09-21
 
+### Client DLL stability hardening - 2026-09-21 (developer build)
+
+- Hardened Client DLL hook failures, background presence updates, DirectX device transitions, custom packet limits, missing custom windows, long settings paths, startup diagnostics, and production feature defaults.
+- Added deterministic Client DLL lifetime protection and verification for the supplied prebuilt desktop interface component.
+- Additional Windows build and live-client compatibility testing is required before deployment; no replacement binary is included with this source update.
+- Requirement: do not deploy a Client DLL replacement from this update yet. No Filter restart, server restart, SQL update, or media update is required.
+
 ### Client DLL deep audit - 2026-09-21 (developer documentation)
 
 - Completed a new independent source audit of the current Client DLL baseline, including startup, hooks, native object lifetimes, DirectX 9, custom interfaces, automation, packets, memory, threads, performance, and loader compatibility.

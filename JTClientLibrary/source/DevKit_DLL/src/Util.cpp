@@ -161,7 +161,8 @@ bool DiagnosticApplyRegisteredMemberHooks(int sourceLine)
     const char* operation = "Core/ApplyRegisteredMemberHooks";
     WriteSetupOperation("begin", operation, sourceLine, 0, 0);
     __try {
-        ApplyRegisteredMemberHooks();
+        if (!ApplyRegisteredMemberHooks())
+            return false;
     }
     __except (LogSetupException(operation, sourceLine, GetExceptionInformation())) {
         return false;
@@ -178,7 +179,8 @@ bool DiagnosticPlaceHook(
 {
     WriteSetupOperation("begin", functionName, sourceLine, address, target);
     __try {
-        placeHook(address, target);
+        if (!placeHook(address, target))
+            return false;
     }
     __except (LogSetupException(functionName, sourceLine, GetExceptionInformation())) {
         return false;
@@ -195,7 +197,8 @@ bool DiagnosticReplaceOffset(
 {
     WriteSetupOperation("begin", functionName, sourceLine, address, target);
     __try {
-        replaceOffset(address, target);
+        if (!replaceOffset(address, target))
+            return false;
     }
     __except (LogSetupException(functionName, sourceLine, GetExceptionInformation())) {
         return false;
@@ -212,7 +215,8 @@ bool DiagnosticReplaceAddress(
 {
     WriteSetupOperation("begin", functionName, sourceLine, address, target);
     __try {
-        replaceAddr(address, target);
+        if (!replaceAddr(address, target))
+            return false;
     }
     __except (LogSetupException(functionName, sourceLine, GetExceptionInformation())) {
         return false;
@@ -230,7 +234,8 @@ bool DiagnosticVftableHook(
 {
     WriteSetupOperation("begin", functionName, sourceLine, address, target);
     __try {
-        vftableHook(address, index, target);
+        if (!vftableHook(address, index, target))
+            return false;
     }
     __except (LogSetupException(functionName, sourceLine, GetExceptionInformation())) {
         return false;
