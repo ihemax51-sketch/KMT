@@ -1,4 +1,5 @@
 #include "IFMacroMenuAutoSkill.h"
+#include <support/SafePath.h>
 #include "Game.h"
 #include "IFMacroMenu.h"
 #include <BSLib/Debug.h>
@@ -983,11 +984,13 @@ void CIFMacroMenuAutoSkill::UpdateMenuSize()
 }
 void CIFMacroMenuAutoSkill::SaveButton(){
     char settingDirectory[MAX_PATH];
-    sprintf(settingDirectory, "%s\\Setting", theApp.GetWorkingDir());
+    if (!KmtFormatPath(settingDirectory, sizeof(settingDirectory), "%s\\Setting", theApp.GetWorkingDir()))
+        return;
     CreateDirectoryA(settingDirectory, NULL);
 
     char buffer3[0x200];
-    sprintf(buffer3, "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str());
+    if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+        return;
 
 // DosyayÄ± yazma modunda aÃ§
     FILE *file = fopen(buffer3, "w");

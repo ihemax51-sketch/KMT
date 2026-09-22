@@ -1,36 +1,46 @@
 #include "hook.h"
 #include <Windows.h>
+#include <new>
 #include <stdio.h>
 
-void placeHook(int trampoline_location, int target_location) {
+namespace {
+bool WriteVerified(void* destination, const void* data, size_t size, DWORD protection) {
+    if (!destination || !data || size == 0)
+        return false;
+    DWORD oldProtection = 0;
+    if (!VirtualProtect(destination, size, protection, &oldProtection))
+        return false;
+    memcpy(destination, data, size);
+    const bool matches = memcmp(destination, data, size) == 0;
+    const BOOL flushed = FlushInstructionCache(GetCurrentProcess(), destination, size);
+    DWORD ignored = 0;
+    const BOOL restored = VirtualProtect(destination, size, oldProtection, &ignored);
+    return matches && flushed != FALSE && restored != FALSE;
+}
+}
+
+bool placeHook(int trampoline_location, int target_location) {
     unsigned char jmp_inst[] = {0xE9, 0x00, 0x00, 0x00, 0x00};
     int distance;
-    DWORD dwProtect = 0;
 
     distance = target_location - trampoline_location - 5;
 
     // Write jump-distance to instruction
     memcpy((jmp_inst + 1), &distance, 4);
 
-    if (!VirtualProtect((LPVOID) trampoline_location, sizeof(jmp_inst), PAGE_EXECUTE_READWRITE, &dwProtect)) {
-        perror("Failed to unprotect memory\n");
-        return;
+    const BYTE currentOpcode = *reinterpret_cast<const BYTE*>(trampoline_location);
+    if (currentOpcode == 0xE9) {
+        const int currentDistance = *reinterpret_cast<const int*>(trampoline_location + 1);
+        return currentDistance == distance;
     }
 
-    memcpy((LPVOID) trampoline_location, jmp_inst, sizeof(jmp_inst));
-    FlushInstructionCache(GetCurrentProcess(), (LPCVOID) trampoline_location, sizeof(jmp_inst));
-
-    DWORD otherProtect;
-    if (!VirtualProtect((LPVOID) trampoline_location, sizeof(jmp_inst), dwProtect, &otherProtect)) {
-        perror("Failed to restore protection on memory");
-    }
+    return WriteVerified((LPVOID)trampoline_location, jmp_inst, sizeof(jmp_inst), PAGE_EXECUTE_READWRITE);
 }
 
-void replaceOffset(int trampoline_location, int target_location) {
+bool replaceOffset(int trampoline_location, int target_location) {
 
     char inst_offset[] = {0x00, 0x00, 0x00, 0x00};
     int distance;
-    DWORD dwProtect = 0;
 
     int offset_location = trampoline_location + 1;
 
@@ -39,78 +49,51 @@ void replaceOffset(int trampoline_location, int target_location) {
     // Write jump-distance to instruction
     memcpy(inst_offset, &distance, 4);
 
-    if (!VirtualProtect((LPVOID) offset_location, sizeof(inst_offset), PAGE_EXECUTE_READWRITE, &dwProtect)) {
-        perror("Failed to unprotect memory\n");
-        return;
-    }
-
-    memcpy((LPVOID) offset_location, inst_offset, sizeof(inst_offset));
-    FlushInstructionCache(GetCurrentProcess(), (LPCVOID) offset_location, sizeof(inst_offset));
-
-    DWORD otherProtect;
-    if (!VirtualProtect((LPVOID) offset_location, sizeof(inst_offset), dwProtect, &otherProtect)) {
-        perror("Failed to restore protection on memory");
-    }
+    const BYTE opcode = *reinterpret_cast<const BYTE*>(trampoline_location);
+    if (*reinterpret_cast<const int*>(offset_location) == distance)
+        return true;
+    // Supported native call sites are CALL rel32. A JMP or any other opcode
+    // here represents foreign/unknown ownership and must not be overwritten.
+    if (opcode != 0xE8)
+        return false;
+    return WriteVerified((LPVOID)offset_location, inst_offset, sizeof(inst_offset), PAGE_EXECUTE_READWRITE);
 }
 
-void replaceAddr(int addr, int value) {
-    DWORD dwProtect;
-
-    if (!VirtualProtect((LPVOID) addr, sizeof(int), PAGE_EXECUTE_READWRITE, &dwProtect)) {
-        perror("Failed to unprotect memory\n");
-        return;
-    }
-
-    *((int *) addr) = value;
-    FlushInstructionCache(GetCurrentProcess(), (LPCVOID) addr, sizeof(int));
-
-    DWORD otherProtect;
-    if (!VirtualProtect((LPVOID) addr, sizeof(int), dwProtect, &otherProtect)) {
-        perror("Failed to restore protection on memory");
-    }
+bool replaceAddr(int addr, int value) {
+    if (*reinterpret_cast<const int*>(addr) == value)
+        return true;
+    return WriteVerified((LPVOID)addr, &value, sizeof(value), PAGE_EXECUTE_READWRITE);
 }
 
-void vftableHook(unsigned int vftable_addr, int offset, int target_func) {
-    replaceAddr(vftable_addr + offset * sizeof(void *), target_func);
+bool vftableHook(unsigned int vftable_addr, int offset, int target_func) {
+    return replaceAddr(vftable_addr + offset * sizeof(void *), target_func);
 }
 
 
-void PatchMe(DWORD address, BYTE value) {
-    DWORD oldProtect;
-    void *addr = reinterpret_cast<void *>(address);
-    if (VirtualProtect(addr, 1, PAGE_READWRITE, &oldProtect) == FALSE) {
-        return;
-    }
-    *reinterpret_cast<BYTE *>(addr) = value;
-    FlushInstructionCache(GetCurrentProcess(), addr, 1);
-    VirtualProtect(addr, 1, oldProtect, &oldProtect);
+bool PatchMe(DWORD address, BYTE value) {
+    if (*reinterpret_cast<const BYTE*>(address) == value)
+        return true;
+    return WriteVerified(reinterpret_cast<void*>(address), &value, 1, PAGE_EXECUTE_READWRITE);
 }
-void PatchJZtoJMP(void* address) {
-    DWORD oldProtect;
-    VirtualProtect(address, 2, PAGE_EXECUTE_READWRITE, &oldProtect); // Bellek korumasını değiştir
+bool PatchJZtoJMP(void* address) {
     unsigned char patch[] = { 0xEB, 0x16 }; // JMP opcode'u
-    memcpy(address, patch, sizeof(patch)); // Opcode'u değiştir
-    VirtualProtect(address, 2, oldProtect, &oldProtect); // Eski korumayı geri yükle
+    return WriteVerified(address, patch, sizeof(patch), PAGE_EXECUTE_READWRITE);
 }
 
-void Patch(char *dst, char *src, int size) {
-    DWORD oldprotect;
-    VirtualProtect(dst, size, PAGE_EXECUTE_READWRITE, &oldprotect);
-    memcpy(dst, src, size);
-    VirtualProtect(dst, size, oldprotect, &oldprotect);
+bool Patch(char *dst, const char *src, int size) {
+    return size > 0 && WriteVerified(dst, src, static_cast<size_t>(size), PAGE_EXECUTE_READWRITE);
 }
 
 bool RenderNop(void *addr, int count) {
-    DWORD oldProtect;
-    if (!VirtualProtect(addr, count, PAGE_EXECUTE_READWRITE, &oldProtect))
+    if (!addr || count <= 0)
         return false;
-
-    memset(addr, 0x90, count);
-    FlushInstructionCache(GetCurrentProcess(), addr, count);
-
-    VirtualProtect(addr, count, oldProtect, &oldProtect);
-
-    return true;
+    unsigned char* bytes = new (std::nothrow) unsigned char[count];
+    if (!bytes)
+        return false;
+    memset(bytes, 0x90, count);
+    const bool result = WriteVerified(addr, bytes, count, PAGE_EXECUTE_READWRITE);
+    delete[] bytes;
+    return result;
 }
 
 
@@ -120,37 +103,13 @@ bool CopyBytes(int dst, const void *src, size_t size) {
 
 
 bool CopyBytes(void *dst, const void *src, size_t size) {
-    DWORD oldProtect;
-    if (VirtualProtect(dst, size, PAGE_READWRITE, &oldProtect) == FALSE)
-        return false;
-    memcpy(dst, src, size);
-    FlushInstructionCache(GetCurrentProcess(), dst, size);
-    if (VirtualProtect(dst, size, oldProtect, &oldProtect) == FALSE)
-        return false;
-    return true;
+    return WriteVerified(dst, src, size, PAGE_EXECUTE_READWRITE);
 }
 
-void CALLFunction(int address, int jumpto) {
-    try {
-        int res = 0;
+bool CALLFunction(int address, int jumpto) {
         char instruction[5];
         RenderCALLInstruction(address, jumpto, instruction);
-        DWORD oldprot, dummy;
-
-        res = VirtualProtect((void *) address, 5, PAGE_EXECUTE_READWRITE, &oldprot);
-
-        if (res == 0) {
-            throw -1;
-        }
-        memcpy((LPVOID) address, (LPVOID) instruction, 5);
-        FlushInstructionCache(GetCurrentProcess(), (LPCVOID) address, 5);
-
-        res = VirtualProtect((void *) address, 5, oldprot, &dummy);
-        if (res == 0) {
-            throw -2;
-        }
-
-    } catch (int ex) { printf("Detour::CALLFUNCTION failed with ex [%d]", ex); }
+        return WriteVerified((void*)address, instruction, 5, PAGE_EXECUTE_READWRITE);
 }
 
 void RenderCALLInstruction(int address, int jumpto, char *buf) {
@@ -161,34 +120,13 @@ void RenderCALLInstruction(int address, int jumpto, char *buf) {
     } catch (int ex) { printf("Detour::RenderCallInstruction failed with ex [%d]", ex); }
 }
 bool Write(uintptr_t offset, const void *data, int length) {
-    LPVOID lpOffset = reinterpret_cast<LPVOID>(offset);
-    DWORD dwOldProtect = 0;
-    if (!VirtualProtect(lpOffset, length, PAGE_READWRITE, &dwOldProtect))
-        return false;
-
-    memcpy(lpOffset, data, length);
-    FlushInstructionCache(GetCurrentProcess(), lpOffset, length);
-
-    return VirtualProtect(lpOffset, length, dwOldProtect, &dwOldProtect);
+    return length > 0 && WriteVerified(reinterpret_cast<void*>(offset), data,
+        static_cast<size_t>(length), PAGE_EXECUTE_READWRITE);
 }
-void JMPFunction(int address, int jumpto) {
-    try {
-        bool res = false;
+bool JMPFunction(int address, int jumpto) {
         char instruction[5];
         RenderJMPInstruction(address, jumpto, instruction);
-        DWORD oldprot, dummy;
-        res = VirtualProtect((void *) address, 5, PAGE_EXECUTE_READWRITE, &oldprot);
-        if (res == false) {
-            throw -1;
-        }
-        memcpy((LPVOID) address, (LPVOID) instruction, 5);
-        FlushInstructionCache(GetCurrentProcess(), (LPCVOID) address, 5);
-
-        res = VirtualProtect((void *) address, 5, oldprot, &dummy);
-        if (res == false) {
-            throw -2;
-        }
-    } catch (int ex) { printf("Detour::JMPFunction failed with ex [%d]", ex); }
+        return WriteVerified((void*)address, instruction, 5, PAGE_EXECUTE_READWRITE);
 }
 
 void RenderJMPInstruction(int address, int jumpto, char *buf) {
