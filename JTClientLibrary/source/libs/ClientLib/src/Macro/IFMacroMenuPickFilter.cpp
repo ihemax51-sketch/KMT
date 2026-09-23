@@ -570,7 +570,46 @@ void CIFMacroMenuPickFilter::PickWithPet()
     if (!g_pMyPlayerObj || !g_pCGInterface || !g_pGfxEttManager || !IsRuntimeReady())
         return;
 
-    if(!PetPickTimerIsRunning)
+static float MacroPickDistance(const D3DVECTOR& a, const D3DVECTOR& b)
+{
+    float dx = a.x - b.x;
+    float dz = a.z - b.z;
+    return sqrt(dx * dx + dz * dz);
+}
+
+bool CIFMacroMenuPickFilter::IsDegreeEnabled(int degree) const
+{
+    CIFCheckBox* boxes[] = {
+        PickDg1CB, PickDg2CB, PickDg3CB, PickDg4CB, PickDg5CB, PickDg6CB,
+        PickDg7CB, PickDg8CB, PickDg9CB, PickDg10CB, PickDg11CB, PickDg12CB,
+        PickDg13CB, PickDg14CB, PickDg15CB, PickDg16CB, PickDg17CB, PickDg18CB
+    };
+    return degree >= 1 && degree <= 18 && boxes[degree - 1] &&
+           boxes[degree - 1]->GetCheckedState_MAYBE();
+}
+
+bool CIFMacroMenuPickFilter::IsRuntimeReady() const
+{
+    return PickViaPetCheckBox && PickViaCharCheckBox && OnlyRareEquiptsCB &&
+           DontPickGoldCB && DontPickAlchemytablesCB && DontPickAlchemyStonesCB &&
+           DontPickElixirsCB && DontPickArrowCB && DontPickReturnCB &&
+           DontPickTrashCB && DontPickHpMp && DontPickVigor;
+}
+
+bool CIFMacroMenuPickFilter::ShouldPickItem(const SItemData* data) const
+{
+    if (!data)
+        return false;
+
+    const bool isGold =
+        data->m_typeId.getTypeID1() == 3 &&
+        data->m_typeId.getTypeID2() == 3 &&
+        data->m_typeId.getTypeID3() == 5 &&
+        data->m_typeId.getTypeID4() == 0;
+    if (isGold)
+        return !DontPickGoldCB->GetCheckedState_MAYBE();
+
+    if (data->m_typeId.getTypeID1() == 3 && data->m_typeId.getTypeID2() == 1)
     {
         PetPickTimerIsRunning = true;
         g_pCGInterface->StartTimer(START_PICK_PET_TIMER, 500);

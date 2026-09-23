@@ -4,6 +4,12 @@
 
 Release date: 2026-09-21
 
+### GameServer deep audit - 2026-09-23 (developer documentation)
+
+- Completed an independent source audit of GameServer threads, packets, native objects, database access, custom systems, performance, memory ownership, and restart behavior.
+- Documented prioritized stability recommendations and Windows staging coverage without changing GameServer behavior, packets, database objects, or deployment files.
+- Requirement: no GameServer replacement, service restart, Filter restart, SQL update, Client DLL replacement, or media update is required.
+
 ### Macro Bot stability hardening - 2026-09-23 (developer build)
 
 - Prevented malformed automation settings, missing custom interface resources, and optional settings failures from crashing or blocking character entry.
