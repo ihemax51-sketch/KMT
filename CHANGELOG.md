@@ -1,5 +1,18 @@
 # KMTGuard Update History
 
+## Update v7.0.2
+
+Release date: 2026-09-23
+
+### Filter database and credential lifecycle hardening
+
+- Kept native party updates responsive during database slowdown by moving non-authoritative party bookkeeping onto the existing bounded background queue.
+- Made queued gameplay database operations cancel safely before execution or wait for a definitive result after execution starts, preventing uncertain late mutations from being reported as cancelled.
+- Reduced reusable Gateway password lifetime with explicitly cleared credential storage across login completion, failure, redirect, and disconnect paths.
+- Bounded runtime health requests with request cancellation and an explicit short database timeout so monitoring cannot exhaust local control handlers during database outages.
+- Applied an explicit default timeout policy to legacy Filter database operations without changing stored procedures, packets, opcodes, or protocol layouts.
+- Requirement: replace and restart all Filter role executables together after Windows staging. No SQL update, Client DLL replacement, media update, GameServer add-on replacement, or ShardManager add-on replacement is required.
+
 ## Update v7.0.1
 
 Release date: 2026-09-23

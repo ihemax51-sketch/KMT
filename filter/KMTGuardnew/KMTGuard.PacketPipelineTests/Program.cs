@@ -33,7 +33,9 @@ await VerifyPacketDataTracksPreviousHandler();
 await VerifyServerBlockStopsPipeline();
 await VerifyInternalPacketAuthentication();
 await VerifyDelayedJobScheduling();
+await VerifyDatabaseJobLifecycle();
 await VerifyConcurrentPacketFinalization();
+VerifyGatewayCredentialLifecycle();
 VerifyRuntimeControlAuthentication();
 VerifyQueuedServerPacketSurvivesHandshake();
 VerifyConfiguredShardStatusIsDeterministic();
@@ -68,6 +70,92 @@ VerifyQuickLoginNonceRefresh();
 VerifyQuickLoginSettingsBootstrap();
 VerifySecondaryPasswordV2Format();
 VerifyAuthenticatedSessionLiveness();
+
+static async Task VerifyDatabaseJobLifecycle()
+{
+    var releaseWorkers = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var workersStarted = new CountdownEvent(2);
+    Task first = DatabaseJobQueue.RunAsyncForTesting(
+        async _ =>
+        {
+            workersStarted.Signal();
+            await releaseWorkers.Task;
+        },
+        TimeSpan.FromSeconds(5),
+        "queue lifecycle blocker one");
+    Task second = DatabaseJobQueue.RunAsyncForTesting(
+        async _ =>
+        {
+            workersStarted.Signal();
+            await releaseWorkers.Task;
+        },
+        TimeSpan.FromSeconds(5),
+        "queue lifecycle blocker two");
+    Assert(workersStarted.Wait(TimeSpan.FromSeconds(2)), "Database queue workers did not start.");
+
+    int cancelledMutationCount = 0;
+    await AssertThrowsAsync<TimeoutException>(() => DatabaseJobQueue.RunAsyncForTesting(
+        _ =>
+        {
+            Interlocked.Increment(ref cancelledMutationCount);
+            return Task.CompletedTask;
+        },
+        TimeSpan.FromMilliseconds(50),
+        "cancel before start"));
+    Assert(cancelledMutationCount == 0, "A database job cancelled before start still executed.");
+
+    int acceptedBackgroundJobs = 0;
+    while (acceptedBackgroundJobs < 600 && DatabaseJobQueue.TryQueueBackground(
+               _ => Task.CompletedTask,
+               operation: "queue saturation probe"))
+    {
+        acceptedBackgroundJobs++;
+    }
+    Assert(acceptedBackgroundJobs < 600, "The bounded database queue did not reject saturation.");
+
+    releaseWorkers.TrySetResult();
+    await Task.WhenAll(first, second);
+
+    var runningStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var releaseRunning = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    int runningMutationCount = 0;
+    Task running = DatabaseJobQueue.RunAsyncForTesting(
+        async _ =>
+        {
+            runningStarted.TrySetResult();
+            await releaseRunning.Task;
+            Interlocked.Increment(ref runningMutationCount);
+        },
+        TimeSpan.FromMilliseconds(50),
+        "running definitive outcome");
+    await runningStarted.Task;
+    await Task.Delay(100);
+    Assert(!running.IsCompleted, "A running database mutation abandoned its waiter at the wait deadline.");
+    releaseRunning.TrySetResult();
+    await running;
+    Assert(runningMutationCount == 1, "A running database mutation did not complete exactly once.");
+
+    await AssertThrowsAsync<InvalidOperationException>(() => DatabaseJobQueue.RunAsyncForTesting(
+        _ => throw new InvalidOperationException("expected database job failure"),
+        TimeSpan.FromSeconds(1),
+        "exception propagation"));
+}
+
+static void VerifyGatewayCredentialLifecycle()
+{
+    using var credential = new GatewayCredential();
+    credential.Replace("first-password");
+    Assert(credential.HasValue, "Gateway credential did not retain an active credential.");
+    Assert(credential.Reveal() == "first-password", "Gateway credential changed the password value.");
+    credential.Replace("replacement-password");
+    Assert(credential.Reveal() == "replacement-password", "Gateway credential replacement failed.");
+    credential.Clear();
+    Assert(!credential.HasValue, "Gateway credential was not cleared.");
+    AssertThrows<InvalidOperationException>(
+        () => credential.Reveal(),
+        "A cleared Gateway credential remained readable.");
+    credential.Clear();
+}
 VerifyExternalBotPacketCompatibility();
 
 Console.WriteLine("Packet pipeline smoke tests passed.");
@@ -740,6 +828,20 @@ static void AssertThrows<TException>(Action action, string message) where TExcep
     }
 
     throw new InvalidOperationException(message);
+}
+
+static async Task AssertThrowsAsync<TException>(Func<Task> action) where TException : Exception
+{
+    try
+    {
+        await action();
+    }
+    catch (TException)
+    {
+        return;
+    }
+
+    throw new InvalidOperationException($"Expected {typeof(TException).Name} was not thrown.");
 }
 
 static async Task VerifyInternalPacketAuthentication()

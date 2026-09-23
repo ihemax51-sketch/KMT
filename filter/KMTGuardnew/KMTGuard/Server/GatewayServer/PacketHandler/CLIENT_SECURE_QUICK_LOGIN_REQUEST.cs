@@ -293,7 +293,7 @@ public partial class SERVER_DLL_SETTINGS_RESPONSE
 
             session.SessionData.locale = locale;
             session.SessionData.user_id = username;
-            session.SessionData.user_pw = password;
+            session.SessionData.GatewayCredential.Replace(password);
             session.SessionData.ServerID = (ushort)serverId;
             session.PlayerUserID = username;
 
@@ -301,20 +301,28 @@ public partial class SERVER_DLL_SETTINGS_RESPONSE
                     username, session.SessionData.Hwid, session.DeviceKeyThumbprint,
                     session.DevicePublicKey))
             {
+                session.SessionData.GatewayCredential.Clear();
                 await SendQuickLoginResult(session, false, PlayerLanguage.Get("QuickLogin.DifferentDevice"));
                 return new PacketResult(PacketResultType.Block);
             }
 
             async Task ReplayQuickLoginAsync()
             {
-                QuickLoginAgentAuthBridge.BeginGatewayLogin(session, username, password, locale);
-                var loginPacket = new Packet(0x6102, true, false);
-                loginPacket.WriteUInt8(locale);
-                loginPacket.WriteAscii(username);
-                loginPacket.WriteAscii(password);
-                loginPacket.WriteUInt16((ushort)serverId);
-                await session.SendToServer(loginPacket);
-                await SendQuickLoginResult(session, true, PlayerLanguage.Get("QuickLogin.Accepted"));
+                try
+                {
+                    QuickLoginAgentAuthBridge.BeginGatewayLogin(session, username, password, locale);
+                    var loginPacket = new Packet(0x6102, true, false);
+                    loginPacket.WriteUInt8(locale);
+                    loginPacket.WriteAscii(username);
+                    loginPacket.WriteAscii(password);
+                    loginPacket.WriteUInt16((ushort)serverId);
+                    await session.SendToServer(loginPacket);
+                    await SendQuickLoginResult(session, true, PlayerLanguage.Get("QuickLogin.Accepted"));
+                }
+                finally
+                {
+                    session.SessionData.GatewayCredential.Clear();
+                }
             }
 
             if (_serverSettings.SecondaryPassword)

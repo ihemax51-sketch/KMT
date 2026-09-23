@@ -269,7 +269,7 @@ namespace KMTGuard.Server.GatewayPacketHandler
                             QuickLoginAgentAuthBridge.BeginGatewayLogin(
                                 session,
                                 session.SessionData.user_id,
-                                session.SessionData.user_pw,
+                                session.SessionData.GatewayCredential.Reveal(),
                                 session.SessionData.locale);
                             session.PendingQuickLogin = false;
                             await SendQuickLoginResult(
@@ -280,7 +280,7 @@ namespace KMTGuard.Server.GatewayPacketHandler
                         if (!await OfflineStallGatewayBridge.TryReplaceOfflineStallLoginAsync(
                                 session,
                                 session.SessionData.user_id,
-                                session.SessionData.user_pw,
+                                session.SessionData.GatewayCredential.Reveal(),
                                 () => ReplayNativeLoginAsync(session),
                                 credentialsAlreadyValidated: true))
                         {
@@ -341,7 +341,7 @@ namespace KMTGuard.Server.GatewayPacketHandler
 
                 session.SessionData.locale = locale;
                 session.SessionData.user_id = user_id;
-                session.SessionData.user_pw = user_pw;
+                session.SessionData.GatewayCredential.Replace(user_pw);
                 session.SessionData.ServerID = ServerID;
 
                 return await ProcessPrimaryLoginAsync(session, replayNativeLogin: false);
@@ -361,7 +361,7 @@ namespace KMTGuard.Server.GatewayPacketHandler
             try
             {
                 var user_id = session.SessionData.user_id;
-                var user_pw = session.SessionData.user_pw;
+                var user_pw = session.SessionData.GatewayCredential.Reveal();
 
                 await BotProtectionService.PopulateClientlessIdentityAsync(session, user_id);
                 var useManagedClientlessLogin = CanUseManagedClientlessLogin(
@@ -531,7 +531,10 @@ namespace KMTGuard.Server.GatewayPacketHandler
             bool replayNativeLogin)
         {
             if (!replayNativeLogin)
+            {
+                session.SessionData.GatewayCredential.Clear();
                 return new PacketResult(PacketResultType.Nothing);
+            }
 
             await ReplayNativeLoginAsync(session);
             return new PacketResult(PacketResultType.Block);
@@ -784,14 +787,21 @@ namespace KMTGuard.Server.GatewayPacketHandler
                 SERVER_GATEWAY_SHARD_LIST_RESPONSE, PacketResultType.Override);
         }
 
-        private static Task ReplayNativeLoginAsync(ISession session)
+        private static async Task ReplayNativeLoginAsync(ISession session)
         {
-            var login = new Packet(0x6102, true, false);
-            login.WriteUInt8(session.SessionData.locale);
-            login.WriteAscii(session.SessionData.user_id);
-            login.WriteAscii(session.SessionData.user_pw);
-            login.WriteUInt16(session.SessionData.ServerID);
-            return session.SendToServer(login);
+            try
+            {
+                var login = new Packet(0x6102, true, false);
+                login.WriteUInt8(session.SessionData.locale);
+                login.WriteAscii(session.SessionData.user_id);
+                login.WriteAscii(session.SessionData.GatewayCredential.Reveal());
+                login.WriteUInt16(session.SessionData.ServerID);
+                await session.SendToServer(login);
+            }
+            finally
+            {
+                session.SessionData.GatewayCredential.Clear();
+            }
         }
 
         private static uint GetDisplayShardCurrent(uint shardCurrent, uint shardCapacity, int fakePlayerCount)

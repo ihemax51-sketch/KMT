@@ -123,7 +123,7 @@ public interface ISessionData
     //// NEWS
     byte locale { get; set; }
     string user_id { get; set; }
-    string user_pw { get; set; }
+    GatewayCredential GatewayCredential { get; }
     ushort ServerID { get; set; }
 
     bool IsInParty { get; set; }
