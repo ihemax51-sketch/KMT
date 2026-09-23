@@ -10,6 +10,15 @@ extern std::vector<setsize_handler_t> hooks_setsize_post;
 
 namespace {
 
+enum KmtDeviceState {
+	KMT_DEVICE_NONE = 0,
+	KMT_DEVICE_READY,
+	KMT_DEVICE_LOST,
+	KMT_DEVICE_RESETTING
+};
+
+volatile LONG g_deviceState = KMT_DEVICE_NONE;
+
 void ApplyTextureQualityBoost(IDirect3DDevice9* device)
 {
 	if (!device)
@@ -83,6 +92,15 @@ void ApplyColorQualityBoost(IDirect3DDevice9* device)
 	device->SetGammaRamp(0, D3DSGR_NO_CALIBRATION, &ramp);
 }
 
+bool ApplyDeviceQuality(IDirect3DDevice9* device)
+{
+	if (!device)
+		return false;
+	ApplyTextureQualityBoost(device);
+	ApplyColorQualityBoost(device);
+	return true;
+}
+
 }
 
 bool CGFXVideo3D_Hook::CreateThingsHook(HWND hWindow, void* msghandler, int a3)
@@ -90,7 +108,13 @@ bool CGFXVideo3D_Hook::CreateThingsHook(HWND hWindow, void* msghandler, int a3)
 	bool a = reinterpret_cast<bool (__thiscall*)(CGFXVideo3d*, HWND, void*, int)>(0x00BAE370)(
 			this, hWindow, msghandler, a3);
 	if (!a || m_pd3dDevice == NULL)
+	{
+		InterlockedExchange(&g_deviceState, KMT_DEVICE_NONE);
 		return a;
+	}
+
+	ApplyDeviceQuality(m_pd3dDevice);
+	InterlockedExchange(&g_deviceState, KMT_DEVICE_READY);
 
 	for (std::vector<create_handler_t>::iterator it = hooks_create.begin();
 		it != hooks_create.end();
@@ -105,8 +129,14 @@ bool CGFXVideo3D_Hook::CreateThingsHook(HWND hWindow, void* msghandler, int a3)
 bool CGFXVideo3D_Hook::EndSceneHook()
 {
 	IDirect3DDevice9* const device = m_pd3dDevice;
-	if (device == NULL)
+	if (device == NULL || InterlockedCompareExchange(&g_deviceState, 0, 0) != KMT_DEVICE_READY)
 		return false;
+
+	const HRESULT cooperativeLevel = device->TestCooperativeLevel();
+	if (FAILED(cooperativeLevel)) {
+		InterlockedExchange(&g_deviceState, KMT_DEVICE_LOST);
+		return false;
+	}
 
 	for (std::vector<endscene_handler_t>::iterator it = hooks_endscene.begin();
 		it != hooks_endscene.end();
@@ -114,9 +144,6 @@ bool CGFXVideo3D_Hook::EndSceneHook()
 	{
 		(*it)();
 	}
-
-	ApplyTextureQualityBoost(device);
-	ApplyColorQualityBoost(device);
 
 	// Full qualified name to avoid redirection through the vftable
 	//return CGFXVideo3D_Hook::EndScene();
@@ -127,6 +154,7 @@ bool CGFXVideo3D_Hook::EndSceneHook()
 
 bool CGFXVideo3D_Hook::SetSizeHook(int width, int height)
 {
+	InterlockedExchange(&g_deviceState, KMT_DEVICE_RESETTING);
 	for (std::vector<setsize_handler_t>::iterator it = hooks_setsize_pre.begin();
 		it != hooks_setsize_pre.end();
 		++it)
@@ -134,7 +162,15 @@ bool CGFXVideo3D_Hook::SetSizeHook(int width, int height)
 		(*it)(width, height);
 	}
 
-	CGFXVideo3d::SetSize(width, height);
+	const bool resized = CGFXVideo3d::SetSize(width, height);
+	if (!resized || m_pd3dDevice == NULL) {
+		InterlockedExchange(&g_deviceState,
+			m_pd3dDevice == NULL ? KMT_DEVICE_NONE : KMT_DEVICE_LOST);
+		return resized;
+	}
+
+	ApplyDeviceQuality(m_pd3dDevice);
+	InterlockedExchange(&g_deviceState, KMT_DEVICE_READY);
 
 	for (std::vector<setsize_handler_t>::iterator it = hooks_setsize_post.begin();
 		it != hooks_setsize_post.end();
@@ -143,5 +179,5 @@ bool CGFXVideo3D_Hook::SetSizeHook(int width, int height)
 		(*it)(width, height);
 	}
 
-	return true;
+	return resized;
 }

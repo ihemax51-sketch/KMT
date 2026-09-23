@@ -16,6 +16,11 @@ void setQuickStartProcess(CGame *game) {
 }
 
 void QuickStart::Setup() {
+#if !KMT_ENABLE_QUICKSTART
+    // Developer credential and callback replacement support is deliberately
+    // excluded from the production configuration.
+    return;
+#else
 
     if (!DoesFileExists(cPath))
         return;
@@ -26,6 +31,7 @@ void QuickStart::Setup() {
         return;
 
     PlaceHooks();
+#endif
 }
 
 void QuickStart::LoadConfig() {

@@ -48,6 +48,8 @@
         GameServer/src/KMTGuardCustom/GameServerRuntimeSafety.cpp
         GameServer/src/KMTGuardCustom/InternalPacketAuth.h
         GameServer/src/KMTGuardCustom/InternalPacketAuth.cpp
+        GameServer/src/KMTGuardCustom/UniqueSpawnGuard.h
+        GameServer/src/KMTGuardCustom/UniqueSpawnGuard.cpp
         GameServer/src/KMTGuardCustom/ItemRegionTravelGuard.h
         GameServer/src/KMTGuardCustom/ItemRegionTravelGuard.cpp
         GameServer/src/KMTGuardCustom/GObjEvents.h GameServer/src/KMTGuardCustom/CGObjPCCustom.cpp GameServer/src/GSLog/LogCustoms.cpp GameServer/src/GSLog/LogCustoms.h GameServer/src/GSLog/Logger.cpp GameServer/src/GSLog/Logger.h GameServer/src/GSLog/MsgCustom.cpp GameServer/src/GSLog/MsgCustom.h GameServer/src/Objects/RgnTerrain.cpp GameServer/src/Objects/RgnTerrain.h)

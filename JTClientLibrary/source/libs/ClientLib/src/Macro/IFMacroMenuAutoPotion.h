@@ -136,6 +136,7 @@ public:
     void UsePetPILL();
     void CheckSummonedPet();
     void CheckDeadPet();
+    bool IsRuntimeReady() const;
     void StartAutomation();
     void StopAutomation();
 

@@ -15,7 +15,8 @@
 
 #define UNIQUE_DPS_MAX_RECORDS 8
 #define UNIQUE_DPS_BATCH_INTERVAL_MS 1000
-#define UNIQUE_DPS_MAX_MOBS_PER_BATCH 256
+#define UNIQUE_DPS_DEFAULT_MAX_MOBS_PER_TICK 16
+#define UNIQUE_DPS_DEFAULT_BUDGET_US 2000
 
 namespace
 {
@@ -38,6 +39,13 @@ namespace
     static std::set<DWORD> s_uniqueDpsPendingMobs;
     static CRITICAL_SECTION s_uniqueDpsStateLock;
     static DWORD s_uniqueDpsLastBatchTick = 0;
+    static unsigned int ReadBoundedEnvironment(const char* name, unsigned int fallback, unsigned int maximum)
+    {
+        char text[16] = { 0 };
+        if (GetEnvironmentVariableA(name, text, sizeof(text)) == 0) return fallback;
+        const unsigned long value = strtoul(text, NULL, 10);
+        return value > 0 && value <= maximum ? static_cast<unsigned int>(value) : fallback;
+    }
 
     struct UniqueDpsStateInitializer
     {
@@ -102,8 +110,8 @@ namespace
         if (pMob->MyMap.empty())
             return false;
 
-        std::vector<std::pair<DWORD, DWORD> > records;
-        records.reserve(pMob->MyMap.size());
+        std::pair<DWORD, DWORD> records[UNIQUE_DPS_MAX_RECORDS];
+        size_t recordCount = 0;
         CGObjPC* pSender = NULL;
         std::map<DWORD, SAggroMapSecondPairItem>::iterator itCur = pMob->MyMap.begin();
         while (itCur != pMob->MyMap.end())
@@ -115,26 +123,31 @@ namespace
                 if (pSender == NULL)
                     pSender = reinterpret_cast<CGObjPC*>(candidate);
 
-                records.push_back(std::make_pair(gidDmgPair.dwPlayerGID, gidDmgPair.dwDamage));
+                const std::pair<DWORD, DWORD> candidateRecord(gidDmgPair.dwPlayerGID, gidDmgPair.dwDamage);
+                size_t insertAt = 0;
+                DamageDescending descending;
+                while (insertAt < recordCount && !descending(candidateRecord, records[insertAt])) ++insertAt;
+                if (insertAt < UNIQUE_DPS_MAX_RECORDS)
+                {
+                    const size_t newCount = recordCount < UNIQUE_DPS_MAX_RECORDS ? recordCount + 1 : recordCount;
+                    for (size_t move = newCount - 1; move > insertAt; --move) records[move] = records[move - 1];
+                    records[insertAt] = candidateRecord; recordCount = newCount;
+                }
             }
 
             ++itCur;
         }
 
-        if (records.empty() || pSender == NULL)
+        if (recordCount == 0 || pSender == NULL)
             return false;
-
-        std::sort(records.begin(), records.end(), DamageDescending());
-        if (records.size() > UNIQUE_DPS_MAX_RECORDS)
-            records.resize(UNIQUE_DPS_MAX_RECORDS);
 
         CMsg* pMsg = pSender->AllocMsg(0x5010);
         if (pMsg == NULL)
             return false;
         *pMsg << pMob->GetRefObjID();
-        *pMsg << static_cast<int>(records.size());
+        *pMsg << static_cast<int>(recordCount);
 
-        for (size_t i = 0; i < records.size(); ++i)
+        for (size_t i = 0; i < recordCount; ++i)
         {
             *pMsg << records[i].first;
             *pMsg << records[i].second;
@@ -157,7 +170,9 @@ void CGObjMob::FlushLiveDpsBatch()
     try
     {
         const DWORD nowTick = GetTickCount();
-        DWORD pendingMobIds[UNIQUE_DPS_MAX_MOBS_PER_BATCH] = { 0 };
+        const unsigned int maxMobs = ReadBoundedEnvironment("KMT_DPS_MAX_MOBS_PER_TICK", UNIQUE_DPS_DEFAULT_MAX_MOBS_PER_TICK, 256);
+        const unsigned int budgetUs = ReadBoundedEnvironment("KMT_DPS_BUDGET_US", UNIQUE_DPS_DEFAULT_BUDGET_US, 20000);
+        DWORD pendingMobIds[256] = { 0 };
         size_t pendingMobCount = 0;
 
         {
@@ -169,7 +184,7 @@ void CGObjMob::FlushLiveDpsBatch()
             s_uniqueDpsLastBatchTick = nowTick;
             std::set<DWORD>::iterator it = s_uniqueDpsPendingMobs.begin();
             while (it != s_uniqueDpsPendingMobs.end() &&
-                   pendingMobCount < UNIQUE_DPS_MAX_MOBS_PER_BATCH)
+                   pendingMobCount < maxMobs)
             {
                 pendingMobIds[pendingMobCount++] = *it;
                 s_uniqueDpsPendingMobs.erase(it++);
@@ -178,9 +193,18 @@ void CGObjMob::FlushLiveDpsBatch()
         }
 
         unsigned int sentPackets = 0;
-        if (g_pCGame != NULL)
+        if (g_pCGame == NULL)
         {
-            for (size_t i = 0; i < pendingMobCount; ++i)
+            UniqueDpsLock guard;
+            for (size_t i = 0; i < pendingMobCount; ++i) s_uniqueDpsPendingMobs.insert(pendingMobIds[i]);
+            UpdatePendingDpsTelemetryLocked();
+        }
+        else
+        {
+            LARGE_INTEGER frequency = { 0 }, started = { 0 }, current = { 0 };
+            QueryPerformanceFrequency(&frequency); QueryPerformanceCounter(&started);
+            size_t i = 0;
+            for (; i < pendingMobCount; ++i)
             {
                 IGObj* object = g_pCGame->GetObjByGameID(pendingMobIds[i]);
                 if (object != NULL && object->IsMonster() &&
@@ -188,6 +212,16 @@ void CGObjMob::FlushLiveDpsBatch()
                 {
                     ++sentPackets;
                 }
+                QueryPerformanceCounter(&current);
+                if (frequency.QuadPart > 0 &&
+                    ((current.QuadPart - started.QuadPart) * 1000000LL / frequency.QuadPart) >= budgetUs)
+                { ++i; break; }
+            }
+            if (i < pendingMobCount)
+            {
+                UniqueDpsLock guard;
+                for (; i < pendingMobCount; ++i) s_uniqueDpsPendingMobs.insert(pendingMobIds[i]);
+                UpdatePendingDpsTelemetryLocked();
             }
         }
 
