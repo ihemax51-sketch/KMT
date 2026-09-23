@@ -14,6 +14,7 @@
 #include <KMTGuardCustom/DamageMeter.h>
 #include <KMTGuardCustom/DurabilityControl.h>
 #include <KMTGuardCustom/GameServerRuntimeSafety.h>
+#include <KMTGuardCustom/UniqueSpawnGuard.h>
 #include <KMTGuardCustom/GameServerTelemetry.h>
 #include <KMTGuardCustom/GObjEvents.h>
 #include <KMTGuardCustom/InternalPacketAuth.h>
@@ -108,6 +109,8 @@ namespace
         DurabilityControl::Shutdown();
         CStaticPatches::Revert();
         InternalPacketAuth::Shutdown();
+        UniqueSpawnGuard::Shutdown();
+        GameServerTelemetry::Shutdown();
         CSqlCon::Shutdown();
     }
 }
@@ -154,6 +157,12 @@ bool Init()
         CGObjPC::Setup();
         CNetHelper::Initialize();
         GameServerTelemetry::Initialize();
+        if (!UniqueSpawnGuard::Initialize())
+        {
+            BS_INFO("[KMTGuard] Unique-spawn policy initialization failed");
+            RollbackInitialization();
+            return false;
+        }
 
         if (!CLogCustoms::Setup(KMTGUARD_VERSION_STRING) ||
             !CDamageMeter::Initialize() ||

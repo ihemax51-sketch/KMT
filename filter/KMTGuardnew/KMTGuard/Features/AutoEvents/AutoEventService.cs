@@ -86,7 +86,9 @@ public static class AutoEventService
         _commandTask = Task.Run(() => ProcessCommandsAsync(_serviceCts.Token));
     }
 
-    public static void Stop()
+    public static void Stop() => StopAsync().GetAwaiter().GetResult();
+
+    public static async Task StopAsync()
     {
         _serviceCts?.Cancel();
         var run = _activeRun;
@@ -102,17 +104,20 @@ public static class AutoEventService
         if (run != null)
             tasks.Add(run.Completion.Task);
 
-        if (tasks.Count == 0)
-            return;
-
         try
         {
-            if (!Task.WhenAll(tasks).Wait(TimeSpan.FromSeconds(15)))
-                Log.Warning("Auto Events shutdown timed out while waiting for background cleanup.");
+            if (tasks.Count > 0)
+                await Task.WhenAll(tasks);
         }
-        catch (AggregateException ex) when (ex.InnerExceptions.All(x => x is OperationCanceledException))
+        catch (OperationCanceledException)
         {
             // Expected during shutdown.
+        }
+        finally
+        {
+            var source = Interlocked.Exchange(ref _serviceCts, null);
+            Interlocked.Exchange(ref _commandTask, null);
+            source?.Dispose();
         }
     }
 
@@ -699,7 +704,7 @@ public static class AutoEventService
             round.WinnerCharID = session.SessionData.Charid;
             round.WinnerCharName = session.SessionData.Charname;
 
-            var summary = await ApplyRewardsAsync(run, session);
+            var summary = await ApplyRewardsAsync(run, round, session);
             try
             {
                 await UpdateWinnerRewardSummaryAsync(round.RoundID, session.SessionData.Charid, summary);
@@ -1651,6 +1656,7 @@ SET Status = @Status,
     {
         await using var connection = new SqlConnection(Program.Connectionstring);
         await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
         var winnerLogTable = EventTable("_AutoEventWinnerLog");
         var inserted = await connection.ExecuteScalarAsync<int>($@"
 IF NOT EXISTS (SELECT 1 FROM {winnerLogTable} WITH (UPDLOCK, HOLDLOCK) WHERE RoundID = @RoundID)
@@ -1675,7 +1681,36 @@ ELSE
                 Hwid = Trim(session.SessionData.Hwid, 128),
                 ClientIP = Trim(session.ClientIp, 64),
                 Answer = Trim(answer, 256)
-            });
+            }, transaction);
+        if (inserted == 1)
+        {
+            foreach (var reward in run.Rewards.Where(value => value.Placement == 1))
+            {
+                string rewardValue = string.Join("|",
+                    reward.Amount,
+                    reward.ItemCodeName128 ?? string.Empty,
+                    reward.ItemID.GetValueOrDefault(),
+                    reward.ItemCount,
+                    reward.Plus);
+                await connection.ExecuteAsync(@"
+INSERT INTO Events.dbo.EventRewardOutbox
+    (RunID, RoundID, CharID, RewardID, RewardType, RewardValue, Status, Attempts, CreatedDate)
+VALUES
+    (@RunID, @RoundID, @CharID, @RewardID, @RewardType, @RewardValue, N'Pending', 0, SYSUTCDATETIME());",
+                    new
+                    {
+                        run.RunID,
+                        round.RoundID,
+                        CharID = session.SessionData.Charid,
+                        reward.RewardID,
+                        reward.RewardType,
+                        RewardValue = rewardValue
+                    },
+                    transaction);
+            }
+        }
+
+        await transaction.CommitAsync();
         return inserted == 1;
     }
 
@@ -1691,7 +1726,10 @@ WHERE RoundID = @RoundID AND CharID = @CharID",
             new { RoundID = roundId, CharID = charId, Summary = Trim(summary, 512) });
     }
 
-    private static async Task<string> ApplyRewardsAsync(ActiveEventRun run, ISession session)
+    private static async Task<string> ApplyRewardsAsync(
+        ActiveEventRun run,
+        ActiveEventRound round,
+        ISession session)
     {
         var rewards = run.Rewards;
         if (rewards.Count == 0)
@@ -1702,7 +1740,9 @@ WHERE RoundID = @RoundID AND CharID = @CharID",
         {
             try
             {
+                await UpdateRewardOutboxAsync(run.RunID, round.RoundID, session.SessionData.Charid, reward.RewardID, "Processing");
                 summaries.Add(await ApplyRewardAsync(session, reward));
+                await UpdateRewardOutboxAsync(run.RunID, round.RoundID, session.SessionData.Charid, reward.RewardID, "Completed");
             }
             catch (Exception ex)
             {
@@ -1710,11 +1750,31 @@ WHERE RoundID = @RoundID AND CharID = @CharID",
                     run.Config.EventCode,
                     session.SessionData.Charid,
                     reward.RewardID);
+                await UpdateRewardOutboxAsync(run.RunID, round.RoundID, session.SessionData.Charid, reward.RewardID, "Pending");
                 summaries.Add(PlayerLanguage.Get("Reward.DeliveryFailed"));
             }
         }
 
         return string.Join(", ", summaries.Where(x => !string.IsNullOrWhiteSpace(x)));
+    }
+
+    private static async Task UpdateRewardOutboxAsync(
+        long runId,
+        long roundId,
+        int charId,
+        int rewardId,
+        string status)
+    {
+        await using var connection = new SqlConnection(Program.Connectionstring);
+        await connection.OpenAsync();
+        await connection.ExecuteAsync(new CommandDefinition(@"
+UPDATE Events.dbo.EventRewardOutbox
+SET Status = @Status,
+    Attempts = CASE WHEN @Status = N'Processing' THEN Attempts + 1 ELSE Attempts END,
+    CompletedDate = CASE WHEN @Status = N'Completed' THEN SYSUTCDATETIME() ELSE NULL END
+WHERE RunID = @RunID AND RoundID = @RoundID AND CharID = @CharID AND RewardID = @RewardID;",
+            new { RunID = runId, RoundID = roundId, CharID = charId, RewardID = rewardId, Status = status },
+            commandTimeout: SqlExecutionPolicy.EventSeconds));
     }
 
     private static Task<string> ApplyRewardAsync(ISession session, AutoEventReward reward)

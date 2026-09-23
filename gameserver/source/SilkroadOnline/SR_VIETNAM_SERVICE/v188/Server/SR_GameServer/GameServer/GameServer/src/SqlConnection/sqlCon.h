@@ -134,7 +134,7 @@ public:
     static void GameServerInitialized();
 
     static CRegionRestrictionDBSet* GetRegionRestrictionDbSet();
-    static bool LoadFortressDPSInfo();
+    static bool LoadFortressDPSInfo(CDbConnection* connection = NULL, bool workerStatement = false);
     static bool IsFortressDpsEnabled(int structObjId);
     static bool ServerAutoCapebyWorldID();
     static std::list<SServerAutoCapebyRegionID> AutoCapeList;
@@ -175,7 +175,7 @@ public:
 
 
 
-    static bool LoadLockedItems();
+    static bool LoadLockedItems(CDbConnection* connection = NULL, bool workerStatement = false);
     static bool IsItemLocked(INT64 itemId);
     static void AddLockedItem(INT64 itemId);
     static void RemoveLockedItem(INT64 itemId);

@@ -243,7 +243,8 @@ namespace KMTGuard.ServerManagers
         {
             var sessions = AgentSessions;
             var targets = sessions.Where(session => IsClientDeliveryTarget(session, clientIsReady));
-            await Task.WhenAll(targets.Select(session => session.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(session => session.SendToClient(packet.CreateReadOnlyClone())));
         }
 
         public static async Task BroadcastPacketToCharName(string CharName, Packet packet, bool clientIsReady = true)
@@ -252,7 +253,8 @@ namespace KMTGuard.ServerManagers
             var targets = sessions.Where(targetSession =>
                 IsClientDeliveryTarget(targetSession, clientIsReady) &&
                 targetSession.SessionData?.Charname == CharName);
-            await Task.WhenAll(targets.Select(targetSession => targetSession.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(targetSession => targetSession.SendToClient(packet.CreateReadOnlyClone())));
         }
 
         public static async Task BroadcastPacketbyWorldID(int WorldID, Packet packet, bool clientIsReady = true)
@@ -261,7 +263,8 @@ namespace KMTGuard.ServerManagers
             var targets = sessions.Where(targetSession =>
                 IsClientDeliveryTarget(targetSession, clientIsReady) &&
                 targetSession.SessionData?.WorldID == WorldID);
-            await Task.WhenAll(targets.Select(targetSession => targetSession.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(targetSession => targetSession.SendToClient(packet.CreateReadOnlyClone())));
         }
 
         public static async Task BroadcastPacketbyRegionID(int Region, Packet packet, bool clientIsReady = true)
@@ -270,7 +273,8 @@ namespace KMTGuard.ServerManagers
             var targets = sessions.Where(targetSession =>
                 IsClientDeliveryTarget(targetSession, clientIsReady) &&
                 targetSession.SessionData?.LatestRegion == Region);
-            await Task.WhenAll(targets.Select(targetSession => targetSession.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(targetSession => targetSession.SendToClient(packet.CreateReadOnlyClone())));
         }
 
         public static async Task RestoreWorldTimerOrCloseByRegionID(int regionId, bool clientIsReady = true)
@@ -332,7 +336,9 @@ namespace KMTGuard.ServerManagers
             }
         }
 
-        public static void Dispose()
+        public static void Dispose() => DisposeAsync().GetAwaiter().GetResult();
+
+        public static async Task DisposeAsync()
         {
             _trackingConnections = false;
 
@@ -347,7 +353,7 @@ namespace KMTGuard.ServerManagers
             {
                 try
                 {
-                    PvpChallengeService.ShutdownAsync("Filter shutdown").GetAwaiter().GetResult();
+                    await PvpChallengeService.ShutdownAsync("Filter shutdown");
                 }
                 catch (Exception ex)
                 {
@@ -363,34 +369,25 @@ namespace KMTGuard.ServerManagers
             foreach (var session in sessions)
                 session.Stop("filter shutdown");
 
-            try
-            {
-                Task.WhenAll(sessions.Select(session => session.ShutdownCompletion))
-                    .WaitAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
-            }
-            catch (TimeoutException)
-            {
-                Log.Warning(
-                    "Session database cleanup did not drain within the 15 second shutdown deadline");
-            }
+            await Task.WhenAll(sessions.Select(session => session.ShutdownCompletion));
 
             if (ActiveRole is FilterRole.Agent or FilterRole.All)
             {
-                OfflineStallService.ShutdownAsync("filter shutdown").GetAwaiter().GetResult();
-                SilkStallService.ShutdownAsync("filter shutdown").GetAwaiter().GetResult();
+                await OfflineStallService.ShutdownAsync("filter shutdown");
+                await SilkStallService.ShutdownAsync("filter shutdown");
                 DatabaseCommands.StopTimers();
-                Scheduler.Stop();
-                AutoEventService.Stop();
-                TelegramNotificationService.Stop();
-                DiscordNotificationService.Stop();
+                await Scheduler.StopAsync();
+                await AutoEventService.StopAsync();
+                await TelegramNotificationService.StopAsync();
+                await DiscordNotificationService.StopAsync();
                 RefManager.StopTimers();
                 ClientlessManager.Stop();
-                TeleportFreezeService.Stop();
-                DatabaseJobQueue.StopAsync().GetAwaiter().GetResult();
+                await TeleportFreezeService.StopAsync();
+                await DatabaseJobQueue.StopAsync();
             }
 
             if (ActiveRole is FilterRole.Agent or FilterRole.Gateway or FilterRole.All)
-                g_DelayedJobMgr.Stop();
+                await g_DelayedJobMgr.StopAsync();
 
             Servers.Clear();
             ServiceCatalog = Array.Empty<__ProxyServices>();

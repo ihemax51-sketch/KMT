@@ -31,7 +31,9 @@ public static class TeleportFreezeService
         _worker = Task.Run(() => ProcessQueueAsync(_shutdown.Token));
     }
 
-    public static void Stop()
+    public static void Stop() => StopAsync().GetAwaiter().GetResult();
+
+    public static async Task StopAsync()
     {
         CancellationTokenSource? shutdown = _shutdown;
         if (shutdown == null)
@@ -40,11 +42,11 @@ public static class TeleportFreezeService
         try
         {
             shutdown.Cancel();
-            _worker?.Wait(TimeSpan.FromSeconds(3));
+            if (_worker != null)
+                await _worker;
         }
-        catch
+        catch (OperationCanceledException) when (shutdown.IsCancellationRequested)
         {
-            // Best-effort shutdown.
         }
         finally
         {

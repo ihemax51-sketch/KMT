@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <climits>
 #include <cstring>
+#include <map>
 #include <psapi.h>
 #pragma comment(lib, "psapi.lib")
 
@@ -16,6 +17,20 @@ namespace
     const size_t OPCODE_TABLE_SIZE = 1024;
     const size_t OPCODE_PROBE_LIMIT = 16;
     const size_t TOP_OPCODE_COUNT = 5;
+    const size_t TELEMETRY_QUEUE_CAPACITY = 64;
+    const size_t TELEMETRY_LINE_CAPACITY = 2048;
+
+    struct TelemetryLine { char text[TELEMETRY_LINE_CAPACITY]; DWORD length; };
+    TelemetryLine s_telemetryQueue[TELEMETRY_QUEUE_CAPACITY];
+    CRITICAL_SECTION s_telemetryQueueLock;
+    HANDLE s_telemetryWakeEvent = NULL;
+    HANDLE s_telemetryStopEvent = NULL;
+    HANDLE s_telemetryThread = NULL;
+    size_t s_telemetryHead = 0, s_telemetryTail = 0, s_telemetryCount = 0;
+    volatile LONG s_telemetryDropped = 0;
+    volatile LONG s_uniqueSpawnRejected[7] = { 0 };
+    CRITICAL_SECTION s_malformedSessionLock;
+    std::map<DWORD, DWORD> s_malformedSessions;
 
     const LONG LATENCY_BUCKET_UPPER_US[LATENCY_BUCKET_COUNT] =
     {
@@ -78,6 +93,16 @@ namespace
     LARGE_INTEGER s_performanceFrequency = { 0 };
     ULONGLONG s_lastProcessCpu100ns = 0;
     DWORD s_processorCount = 1;
+
+    struct TelemetryLocks
+    {
+        TelemetryLocks() { InitializeCriticalSection(&s_telemetryQueueLock); InitializeCriticalSection(&s_malformedSessionLock); }
+        ~TelemetryLocks()
+        {
+            if (s_telemetryThread != NULL) return;
+            DeleteCriticalSection(&s_malformedSessionLock); DeleteCriticalSection(&s_telemetryQueueLock);
+        }
+    } s_telemetryLocks;
 
     LONG ClampSize(size_t value)
     {
@@ -312,6 +337,46 @@ namespace
         }
     }
 
+    bool DequeueTelemetry(TelemetryLine& line)
+    {
+        EnterCriticalSection(&s_telemetryQueueLock);
+        if (s_telemetryCount == 0) { LeaveCriticalSection(&s_telemetryQueueLock); return false; }
+        line = s_telemetryQueue[s_telemetryHead];
+        s_telemetryHead = (s_telemetryHead + 1) % TELEMETRY_QUEUE_CAPACITY; --s_telemetryCount;
+        LeaveCriticalSection(&s_telemetryQueueLock); return true;
+    }
+
+    DWORD WINAPI TelemetryWriter(LPVOID)
+    {
+        HANDLE waits[2] = { s_telemetryStopEvent, s_telemetryWakeEvent };
+        for (;;)
+        {
+            const DWORD result = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+            TelemetryLine line;
+            while (DequeueTelemetry(line))
+            {
+                RotateTelemetryIfNeeded();
+                HANDLE file = CreateFileA(TELEMETRY_FILE, FILE_APPEND_DATA,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                    OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                if (file != INVALID_HANDLE_VALUE) { DWORD written = 0; WriteFile(file, line.text, line.length, &written, NULL); CloseHandle(file); }
+            }
+            if (result == WAIT_OBJECT_0) break;
+        }
+        return 0;
+    }
+
+    void EnqueueTelemetry(const char* line, DWORD length)
+    {
+        if (line == NULL || length == 0 || length >= TELEMETRY_LINE_CAPACITY || s_telemetryThread == NULL) return;
+        EnterCriticalSection(&s_telemetryQueueLock);
+        if (s_telemetryCount == TELEMETRY_QUEUE_CAPACITY) InterlockedIncrement(&s_telemetryDropped);
+        else { TelemetryLine& target = s_telemetryQueue[s_telemetryTail]; memcpy(target.text, line, length); target.text[length] = '\0'; target.length = length;
+            s_telemetryTail = (s_telemetryTail + 1) % TELEMETRY_QUEUE_CAPACITY; ++s_telemetryCount; }
+        LeaveCriticalSection(&s_telemetryQueueLock);
+        if (s_telemetryWakeEvent != NULL) SetEvent(s_telemetryWakeEvent);
+    }
+
     void TryWriteSnapshot(DWORD nowTick)
     {
         const DWORD previousTick = static_cast<DWORD>(
@@ -333,6 +398,10 @@ namespace
         for (int authIndex = 0; authIndex < 7; ++authIndex)
             authFailures[authIndex] = InterlockedExchange(&s_packetAuthFailures[authIndex], 0);
         const LONG runtimeErrors = InterlockedExchange(&s_runtimeErrors, 0);
+        LONG uniqueSpawnRejected = 0;
+        for (int rejectIndex = 0; rejectIndex < 7; ++rejectIndex)
+            uniqueSpawnRejected += InterlockedExchange(&s_uniqueSpawnRejected[rejectIndex], 0);
+        const LONG telemetryDropped = InterlockedExchange(&s_telemetryDropped, 0);
         const LONG clientHandlerMaxUs = InterlockedExchange(&s_clientHandlerMaxUs, 0);
         const LONG serverHandlerMaxUs = InterlockedExchange(&s_serverHandlerMaxUs, 0);
         const LONG gameLoopGapMaxMs = InterlockedExchange(&s_gameLoopGapMaxMs, 0);
@@ -397,7 +466,7 @@ namespace
             sizeof(line),
             _TRUNCATE,
             "%04u-%02u-%02u %02u:%02u:%02u cpu_pct=%.2f private_mb=%.1f working_set_mb=%.1f handles=%lu "
-            "client_pps=%.2f server_pps=%.2f malformed=%ld runtime_errors=%ld "
+            "client_pps=%.2f server_pps=%.2f malformed=%ld runtime_errors=%ld unique_spawn_rejected=%ld telemetry_dropped=%ld "
             "auth_not_ready=%ld auth_version=%ld auth_gameid=%ld auth_expired=%ld auth_replay=%ld auth_mac=%ld "
             "client_us=%ld/%ld/%ld/%ld server_us=%ld/%ld/%ld/%ld "
             "game_loop_us=%ld/%ld/%ld/%ld game_loop_gap_max_ms=%ld "
@@ -411,7 +480,7 @@ namespace
             time.wHour, time.wMinute, time.wSecond,
             cpuPercent, privateMemoryMb, workingSetMb, handleCount,
             clientPacketsPerSecond, serverPacketsPerSecond,
-            malformedPackets, runtimeErrors,
+            malformedPackets, runtimeErrors, uniqueSpawnRejected, telemetryDropped,
             authFailures[1], authFailures[2], authFailures[3],
             authFailures[4], authFailures[5], authFailures[6],
             clientP50Us, clientP95Us, clientP99Us, clientHandlerMaxUs,
@@ -432,21 +501,7 @@ namespace
         if (length <= 0)
             return;
 
-        RotateTelemetryIfNeeded();
-        HANDLE file = CreateFileA(
-            TELEMETRY_FILE,
-            FILE_APPEND_DATA,
-            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-            NULL,
-            OPEN_ALWAYS,
-            FILE_ATTRIBUTE_NORMAL,
-            NULL);
-        if (file != INVALID_HANDLE_VALUE)
-        {
-            DWORD written = 0;
-            WriteFile(file, line, static_cast<DWORD>(length), &written, NULL);
-            CloseHandle(file);
-        }
+        EnqueueTelemetry(line, static_cast<DWORD>(length));
 
         char title[160];
         _snprintf_s(
@@ -463,6 +518,13 @@ namespace
 
 void GameServerTelemetry::Initialize()
 {
+    if (s_telemetryThread == NULL)
+    {
+        s_telemetryStopEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
+        s_telemetryWakeEvent = CreateEventA(NULL, FALSE, FALSE, NULL);
+        if (s_telemetryStopEvent != NULL && s_telemetryWakeEvent != NULL)
+            s_telemetryThread = CreateThread(NULL, 0, TelemetryWriter, NULL, 0, NULL);
+    }
     QueryPerformanceFrequency(&s_performanceFrequency);
     SYSTEM_INFO systemInfo;
     GetSystemInfo(&systemInfo);
@@ -483,6 +545,19 @@ void GameServerTelemetry::Initialize()
     InterlockedExchange(&s_lastQueueTimerTick, static_cast<LONG>(nowTick));
 }
 
+void GameServerTelemetry::Shutdown()
+{
+    if (s_telemetryStopEvent != NULL) SetEvent(s_telemetryStopEvent);
+    if (s_telemetryThread != NULL)
+    {
+        if (WaitForSingleObject(s_telemetryThread, 5000) != WAIT_OBJECT_0)
+            return; // Retain every synchronization object beneath a stuck writer.
+        CloseHandle(s_telemetryThread); s_telemetryThread = NULL;
+    }
+    if (s_telemetryWakeEvent != NULL) { CloseHandle(s_telemetryWakeEvent); s_telemetryWakeEvent = NULL; }
+    if (s_telemetryStopEvent != NULL) { CloseHandle(s_telemetryStopEvent); s_telemetryStopEvent = NULL; }
+}
+
 void GameServerTelemetry::RecordMalformedPacket()
 {
     InterlockedIncrement(&s_malformedPackets);
@@ -497,6 +572,29 @@ void GameServerTelemetry::RecordPacketAuthFailure(int reason)
 void GameServerTelemetry::RecordRuntimeError()
 {
     InterlockedIncrement(&s_runtimeErrors);
+}
+
+void GameServerTelemetry::RecordUniqueSpawnRejected(int reason)
+{
+    if (reason >= 0 && reason < 7) InterlockedIncrement(&s_uniqueSpawnRejected[reason]);
+}
+
+void GameServerTelemetry::RecordMalformedPacketForSession(DWORD sessionId, WORD)
+{
+    RecordMalformedPacket();
+    if (sessionId == 0) return;
+    EnterCriticalSection(&s_malformedSessionLock);
+    DWORD& count = s_malformedSessions[sessionId];
+    if (count != 0xFFFFFFFF) ++count;
+    if (s_malformedSessions.size() > 8192) s_malformedSessions.erase(s_malformedSessions.begin());
+    LeaveCriticalSection(&s_malformedSessionLock);
+}
+
+void GameServerTelemetry::ForgetSession(DWORD sessionId)
+{
+    EnterCriticalSection(&s_malformedSessionLock);
+    s_malformedSessions.erase(sessionId);
+    LeaveCriticalSection(&s_malformedSessionLock);
 }
 
 void GameServerTelemetry::RecordLiveDpsBatch(unsigned int packetCount)

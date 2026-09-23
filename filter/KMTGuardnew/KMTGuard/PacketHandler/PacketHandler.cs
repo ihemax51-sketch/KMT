@@ -307,6 +307,7 @@ namespace KMTGuard.PacketHandlerManager
             }
             catch (Exception ex)
             {
+                session.ReportMalformedPacket(packet.Opcode, "pipeline", ex.GetType().Name);
                 Log.Warning(ex, "Packet handler failed for {ClientIp} opcode 0x{Opcode:X4}; packet blocked",
                     session?.ClientIp ?? "Unknown", packet.Opcode);
                 return new PacketResult(data, null, PacketResultType.Block);

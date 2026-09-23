@@ -16,6 +16,7 @@ fnMessageBoxW pfnOrigMessageBoxW = NULL;
 namespace
 {
     __declspec(thread) bool s_insideMessageBoxHook = false;
+    HMODULE s_processLifetimeModule = NULL;
 
     bool IsIgnorablePackagePriceMessage(const char* text)
     {
@@ -142,6 +143,14 @@ static void RemoveSystemMessageHooks()
 static DWORD InitializeGameServerAddonCore(HMODULE hModule)
 {
         GameServerConsole::Initialize();
+        if (!GetModuleHandleExA(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                reinterpret_cast<LPCSTR>(&InitializeGameServerAddonCore),
+                &s_processLifetimeModule))
+        {
+            GameServerConsole::WriteFailure("GameServer add-on process-lifetime pin failed");
+            return ERROR_DLL_INIT_FAILED;
+        }
         GameServerCrashHandler::Initialize(hModule);
 
         if (!GameServerRuntimeSafety::ValidateHost())

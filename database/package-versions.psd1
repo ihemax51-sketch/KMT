@@ -410,5 +410,14 @@
                 "disable_original_trade_gold_validation.sql"
             )
         }
+        @{
+            Version = "v7.0.1"
+            Migrations = @(
+                "20260923_event_reward_outbox.sql"
+            )
+            Validation = @(
+                "event_reward_outbox_validation.sql"
+            )
+        }
     )
 }

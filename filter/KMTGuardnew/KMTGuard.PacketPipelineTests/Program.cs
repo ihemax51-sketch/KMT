@@ -33,6 +33,8 @@ await VerifyPacketDataTracksPreviousHandler();
 await VerifyServerBlockStopsPipeline();
 await VerifyInternalPacketAuthentication();
 await VerifyDelayedJobScheduling();
+await VerifyConcurrentPacketFinalization();
+VerifyRuntimeControlAuthentication();
 VerifyQueuedServerPacketSurvivesHandshake();
 VerifyConfiguredShardStatusIsDeterministic();
 VerifyGmIpMaintenanceBypass();
@@ -69,6 +71,41 @@ VerifyAuthenticatedSessionLiveness();
 VerifyExternalBotPacketCompatibility();
 
 Console.WriteLine("Packet pipeline smoke tests passed.");
+
+static async Task VerifyConcurrentPacketFinalization()
+{
+    var broadcast = new Packet(0x7775);
+    broadcast.WriteUInt32(0x12345678);
+    broadcast.WriteUnicode("broadcast-payload");
+
+    var tasks = Enumerable.Range(0, 1000).Select(async index =>
+    {
+        await Task.Delay(index % 7);
+        broadcast.ToReadOnly();
+        var copy = broadcast.CreateReadOnlyClone();
+        Assert(copy.ReadUInt32() == 0x12345678 &&
+               copy.ReadUnicode() == "broadcast-payload" &&
+               copy.RemainingRead() == 0,
+            "Concurrent broadcast packet finalization corrupted a session copy.");
+    });
+
+    await Task.WhenAll(tasks);
+}
+
+static void VerifyRuntimeControlAuthentication()
+{
+    var request = new KMTGuard.RuntimeContract.RuntimeRequest
+    {
+        Command = "runtime.ping",
+        Payload = "{}"
+    };
+    KMTGuard.RuntimeContract.RuntimeRequestAuthentication.Sign(request);
+    Assert(KMTGuard.RuntimeContract.RuntimeRequestAuthentication.Verify(request, TimeSpan.FromMinutes(1)),
+        "A signed runtime-control request did not verify.");
+    request.Payload = "{\"tampered\":true}";
+    Assert(!KMTGuard.RuntimeContract.RuntimeRequestAuthentication.Verify(request, TimeSpan.FromMinutes(1)),
+        "Runtime-control authentication accepted a modified payload.");
+}
 
 static void VerifyExternalBotPacketCompatibility()
 {

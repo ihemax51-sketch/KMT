@@ -1,4 +1,6 @@
 using System.IO.Pipes;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace KMTGuard.RuntimeContract;
@@ -22,6 +24,80 @@ public sealed class RuntimeRequest
 {
     public string Command { get; set; } = string.Empty;
     public string? Payload { get; set; }
+    public long TimestampUnixSeconds { get; set; }
+    public string Nonce { get; set; } = string.Empty;
+    public string AuthenticationTag { get; set; } = string.Empty;
+}
+
+public static class RuntimeRequestAuthentication
+{
+    private static readonly Lazy<byte[]> Key = new(LoadOrCreateKey, true);
+
+    public static void Sign(RuntimeRequest request)
+    {
+        request.TimestampUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        request.Nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+        request.AuthenticationTag = ComputeTag(request);
+    }
+
+    public static bool Verify(RuntimeRequest request, TimeSpan allowedClockSkew)
+    {
+        if (string.IsNullOrWhiteSpace(request.Nonce) ||
+            string.IsNullOrWhiteSpace(request.AuthenticationTag) ||
+            Math.Abs(DateTimeOffset.UtcNow.ToUnixTimeSeconds() - request.TimestampUnixSeconds) >
+            allowedClockSkew.TotalSeconds)
+            return false;
+
+        try
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(request.AuthenticationTag),
+                Convert.FromHexString(ComputeTag(request)));
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static string ComputeTag(RuntimeRequest request)
+    {
+        string canonical = string.Concat(
+            request.Command, "\n",
+            request.TimestampUnixSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture), "\n",
+            request.Nonce, "\n",
+            request.Payload ?? string.Empty);
+        using var hmac = new HMACSHA256(Key.Value);
+        return Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(canonical)));
+    }
+
+    private static byte[] LoadOrCreateKey()
+    {
+        string root = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "KMTGuard");
+        Directory.CreateDirectory(root);
+        string path = Path.Combine(root, "runtime-control.key");
+        try
+        {
+            return Convert.FromBase64String(File.ReadAllText(path).Trim());
+        }
+        catch (FileNotFoundException)
+        {
+            byte[] key = RandomNumberGenerator.GetBytes(32);
+            try
+            {
+                using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                using var writer = new StreamWriter(stream, Encoding.ASCII);
+                writer.Write(Convert.ToBase64String(key));
+                return key;
+            }
+            catch (IOException)
+            {
+                return Convert.FromBase64String(File.ReadAllText(path).Trim());
+            }
+        }
+    }
 }
 
 public sealed class RuntimeResponse
@@ -45,6 +121,10 @@ public sealed class RuntimeSnapshot
     public int CommandQueueDepth { get; set; }
     public long? OldestCommandAgeSeconds { get; set; }
     public long RejectedMassivePackets { get; set; }
+    public int DatabaseWorkerQueueDepth { get; set; }
+    public long DatabaseWorkerDroppedJobs { get; set; }
+    public long DatabaseWorkerQueueAgeMs { get; set; }
+    public long DatabaseWorkerExecutionMs { get; set; }
     public DateTime? CacheLastRefreshUtc { get; set; }
 }
 
@@ -117,8 +197,11 @@ public sealed class QuickLoginAuthPayload
 {
     public uint Token { get; set; }
     public string Username { get; set; } = string.Empty;
-    public string Password { get; set; } = string.Empty;
+    public byte[] PasswordCipher { get; set; } = Array.Empty<byte>();
+    public byte[] PasswordNonce { get; set; } = Array.Empty<byte>();
+    public byte[] PasswordTag { get; set; } = Array.Empty<byte>();
     public string ClientIp { get; set; } = string.Empty;
+    public string DeviceKeyThumbprint { get; set; } = string.Empty;
     public byte Locale { get; set; }
     public DateTime ExpiresAtUtc { get; set; }
 }
@@ -164,6 +247,7 @@ public static class RuntimePipeClient
             Command = command,
             Payload = payload is null ? null : JsonSerializer.Serialize(payload, JsonOptions)
         };
+        RuntimeRequestAuthentication.Sign(request);
 
         await writer.WriteLineAsync(JsonSerializer.Serialize(request, JsonOptions));
         var responseLine = await reader.ReadLineAsync(timeoutSource.Token);

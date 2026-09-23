@@ -9,17 +9,37 @@
 
 DiscordManager* m_dc;
 
-DiscordManager::DiscordManager() : m_IsStarted(false), m_IsRunning(false), m_IsConnected(false), m_GameState(LOADING), m_InGameTimestamp(0) {
+DiscordManager::DiscordManager() : m_IsStarted(0), m_IsRunning(0), m_IsConnected(0), m_GameState(LOADING), m_InGameTimestamp(0), m_Thread(NULL), m_ThreadId(0), m_StopEvent(NULL) {
+    InitializeCriticalSection(&m_SnapshotLock);
+    m_Snapshot.state = LOADING;
+    m_Snapshot.startedAt = 0;
+}
+
+DiscordManager::~DiscordManager() {
+    Stop();
+    DeleteCriticalSection(&m_SnapshotLock);
 }
 
 void DiscordManager::Start(DiscordClientId CLIENT_ID) {
     try {
         m_CLIENT_ID = CLIENT_ID;
-        if (!m_IsStarted && !m_IsRunning) {
-            m_IsStarted = m_IsRunning = true;
-            HANDLE hThread = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)DiscordManager::DiscordThread, 0, 0, 0);
+        if (InterlockedCompareExchange(&m_IsStarted, 1, 0) == 0) {
+            m_StopEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+            if (!m_StopEvent) {
+                InterlockedExchange(&m_IsStarted, 0);
+                return;
+            }
+            InterlockedExchange(&m_IsRunning, 1);
+            m_Thread = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)DiscordManager::DiscordThread, 0, 0, &m_ThreadId);
+            if (!m_Thread) {
+                CloseHandle(m_StopEvent);
+                m_StopEvent = NULL;
+                InterlockedExchange(&m_IsRunning, 0);
+                InterlockedExchange(&m_IsStarted, 0);
+                return;
+            }
             // Set discord stuffs as background process (below normal)
-            SetThreadPriority(hThread, -1);
+            SetThreadPriority(m_Thread, THREAD_PRIORITY_BELOW_NORMAL);
         }
     } catch (const std::exception& e) {
         std::cout << "Error starting DiscordManager: " << e.what() << std::endl;
@@ -37,81 +57,21 @@ void DiscordManager::UpdateState(GAME_STATE State) {
         if (m_GameState != GAME_STATE::IN_GAME && State == GAME_STATE::IN_GAME)
             m_InGameTimestamp = std::time(0);
 
-        m_GameState = State;
-
-        if (!m_IsConnected)
-            return;
-
-        struct DiscordActivity activity;
-        memset(&activity, 0, sizeof(activity));
-
-        switch (State) {
-            default:
-            case GAME_STATE::LOADING:
-                sprintf(activity.state, "Loading");
-                sprintf(activity.assets.large_image, "logo");
-                sprintf(activity.assets.large_text, "Lexa Online");
-                break;
-            case GAME_STATE::SERVER_SELECTION:
-                sprintf(activity.state, "Selecting Server");
-                sprintf(activity.assets.large_image, "logo");
-                sprintf(activity.assets.large_text, "Lexa Online");
-                break;
-            case GAME_STATE::CHARACTER_SELECTION:
-                sprintf(activity.state, "Selecting Character");
-                sprintf(activity.assets.large_image, "logo");
-                sprintf(activity.assets.large_text, "Lexa Online");
-                break;
-            case GAME_STATE::IN_GAME:
-                if(g_pMyPlayerObj != NULL) {
-                    switch (g_pMyPlayerObj->GetJobType()) {
-                        case 1:
-                            sprintf(activity.state, "Job Mode (Trader)");
-                            break;
-                        case 2:
-                            sprintf(activity.state, "Job Mode (Thief)");
-                            break;
-                        case 3:
-                            sprintf(activity.state, "Job Mode (Hunter)");
-                            break;
-                        default:
-                            sprintf(activity.state, "Playing VSRO");
-                            break;
-                    }
-
-                    std::stringstream details;
-                    std::n_wstring nwCharName = g_pMyPlayerObj->GetCharName();
-                    std::string charName(nwCharName.begin(), nwCharName.end());
-                    details << charName << "\nLv." << (int)g_pMyPlayerObj->m_btLevel;
-
-                    std::string GuildName = TO_STRING(g_pMyPlayerObj->GetGuildName());
-                    if (!GuildName.empty())
-                        details << "\n[" << GuildName.c_str() << "]";
-
-                    sprintf_s(activity.details, details.str().c_str());
-
-                    if (g_pMyPlayerObj->GetJobType() == TRIJOB_TYPE::TRIJOB_NOJOB) {
-                        std::wstringstream region;
-                        region << g_pMyPlayerObj->GetRegion().r;
-                        const std::n_wstring* nwRegionName = g_CTextStringManager->GetString2(region.str().c_str());
-                        std::string regionName(nwRegionName->begin(), nwRegionName->end());
-                        sprintf_s(activity.assets.large_text, regionName.c_str());
-                    }
-
-                    sprintf(activity.assets.small_image, "logo");
-                    sprintf(activity.assets.small_text, "https://lexashield.online/");
-                    activity.timestamps.start = m_InGameTimestamp;
-
-                    // Butonları ekleyin
-                    strcpy(activity.buttons[0].label, "Join Us");
-                    strcpy(activity.buttons[0].url, "https://lexashield.online/join");
-                    strcpy(activity.buttons[1].label, "Discord");
-                    strcpy(activity.buttons[1].url, "https://discord.gg/yourdiscord");
-                }
-                break;
+        PresenceSnapshot snapshot;
+        snapshot.state = State;
+        snapshot.startedAt = m_InGameTimestamp;
+        snapshot.largeText = "KMTGuard";
+        if (State == IN_GAME && g_pMyPlayerObj != NULL) {
+            std::stringstream details;
+            const std::n_wstring character = g_pMyPlayerObj->GetCharName();
+            details << std::string(character.begin(), character.end()) << " Lv."
+                    << static_cast<int>(g_pMyPlayerObj->m_btLevel);
+            snapshot.details = details.str();
         }
-
-        m_App.activities->update_activity(m_App.activities, &activity, m_App.application, UpdateActivityCallback);
+        EnterCriticalSection(&m_SnapshotLock);
+        m_GameState = State;
+        m_Snapshot = snapshot;
+        LeaveCriticalSection(&m_SnapshotLock);
     } catch (const std::exception& e) {
         std::cout << "Error updating state: " << e.what() << std::endl;
     }
@@ -119,10 +79,27 @@ void DiscordManager::UpdateState(GAME_STATE State) {
 
 void DiscordManager::Stop() {
     try {
-        m_IsStarted = false;
+        RequestStop();
+        if (m_Thread && GetCurrentThreadId() != m_ThreadId) {
+            if (WaitForSingleObject(m_Thread, 10000) == WAIT_OBJECT_0) {
+                CloseHandle(m_Thread);
+                m_Thread = NULL;
+                m_ThreadId = 0;
+                if (m_StopEvent) {
+                    CloseHandle(m_StopEvent);
+                    m_StopEvent = NULL;
+                }
+            }
+        }
     } catch (const std::exception& e) {
         std::cout << "Error stopping DiscordManager: " << e.what() << std::endl;
     }
+}
+
+void DiscordManager::RequestStop() {
+    InterlockedExchange(&m_IsStarted, 0);
+    if (m_StopEvent)
+        SetEvent(m_StopEvent);
 }
 
 void OnUserUpdated(void* data) {
@@ -130,7 +107,7 @@ void OnUserUpdated(void* data) {
         if (m_dc && m_dc->m_App.users) {
             m_dc->m_App.users->get_current_user(m_dc->m_App.users, &m_dc->m_App.currentUser);
             //printf("Connected user: %s#%s\r\n", m_dc->m_App.currentUser.username, m_dc->m_App.currentUser.discriminator);
-            m_dc->UpdateState();
+            m_dc->PublishActivity();
         } else {
             std::cout << "Error: m_dc or m_dc->m_App.users is null" << std::endl;
         }
@@ -141,7 +118,8 @@ void OnUserUpdated(void* data) {
 
 void SignalInterrupt(int code) {
     try {
-        m_dc->Stop();
+        if (m_dc)
+            m_dc->RequestStop();
     } catch (const std::exception& e) {
         std::cout << "Error in SignalInterrupt: " << e.what() << std::endl;
     }
@@ -166,15 +144,16 @@ DWORD WINAPI DiscordManager::DiscordThread() {
 
         do {
             EDiscordResult result = DiscordCreate(DISCORD_VERSION, &params, &m_dc->m_App.core);
-            if (!m_dc->m_IsStarted) {
-                m_dc->m_IsRunning = false;
+            if (InterlockedCompareExchange(&m_dc->m_IsStarted, 0, 0) == 0) {
+                InterlockedExchange(&m_dc->m_IsRunning, 0);
                 return 0;
             }
             if (result == DiscordResult_Ok) {
-                m_dc->m_IsConnected = true;
+                InterlockedExchange(&m_dc->m_IsConnected, 1);
                 break;
             }
-            Sleep(30000);
+            if (WaitForSingleObject(m_dc->m_StopEvent, 30000) == WAIT_OBJECT_0)
+                return 0;
         } while (true);
 
         m_dc->m_App.users = m_dc->m_App.core->get_user_manager(m_dc->m_App.core);
@@ -185,24 +164,54 @@ DWORD WINAPI DiscordManager::DiscordThread() {
 
         signal(SIGINT, SignalInterrupt);
 
-        while (m_dc->m_IsStarted) {
+        while (InterlockedCompareExchange(&m_dc->m_IsStarted, 0, 0) != 0) {
             m_dc->m_App.core->run_callbacks(m_dc->m_App.core);
-            Sleep(2500);
+            m_dc->PublishActivity();
+            if (WaitForSingleObject(m_dc->m_StopEvent, 2500) == WAIT_OBJECT_0)
+                break;
         }
 
-        m_dc->m_IsConnected = m_dc->m_IsRunning = false;
+        if (m_dc->m_App.core)
+            m_dc->m_App.core->destroy(m_dc->m_App.core);
+        memset(&m_dc->m_App, 0, sizeof(m_dc->m_App));
+        InterlockedExchange(&m_dc->m_IsConnected, 0);
+        InterlockedExchange(&m_dc->m_IsRunning, 0);
     } catch (const std::exception& e) {
         std::cout << "Error in DiscordThread: " << e.what() << std::endl;
-        m_dc->m_IsRunning = false;
+        InterlockedExchange(&m_dc->m_IsRunning, 0);
     }
     return 0;
 }
 
 void DiscordManager::UpdateState() {
     try {
-        UpdateState(m_GameState);
-        // Diğer güncelleme işlemleri...
+        PublishActivity();
     } catch (const std::exception& e) {
         std::cout << "Error in UpdateState: " << e.what() << std::endl;
     }
+}
+
+DiscordManager::PresenceSnapshot DiscordManager::GetSnapshot() {
+    EnterCriticalSection(&m_SnapshotLock);
+    PresenceSnapshot snapshot = m_Snapshot;
+    LeaveCriticalSection(&m_SnapshotLock);
+    return snapshot;
+}
+
+void DiscordManager::PublishActivity() {
+    if (InterlockedCompareExchange(&m_IsConnected, 0, 0) == 0 || !m_App.activities)
+        return;
+    const PresenceSnapshot snapshot = GetSnapshot();
+    DiscordActivity activity;
+    memset(&activity, 0, sizeof(activity));
+    const char* state = "Loading";
+    if (snapshot.state == SERVER_SELECTION) state = "Selecting Server";
+    else if (snapshot.state == CHARACTER_SELECTION) state = "Selecting Character";
+    else if (snapshot.state == IN_GAME) state = "Playing VSRO";
+    strncpy_s(activity.state, sizeof(activity.state), state, _TRUNCATE);
+    strncpy_s(activity.details, sizeof(activity.details), snapshot.details.c_str(), _TRUNCATE);
+    strncpy_s(activity.assets.large_image, sizeof(activity.assets.large_image), "logo", _TRUNCATE);
+    strncpy_s(activity.assets.large_text, sizeof(activity.assets.large_text), snapshot.largeText.c_str(), _TRUNCATE);
+    activity.timestamps.start = snapshot.startedAt;
+    m_App.activities->update_activity(m_App.activities, &activity, m_App.application, UpdateActivityCallback);
 }

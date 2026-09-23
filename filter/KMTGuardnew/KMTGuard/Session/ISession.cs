@@ -26,6 +26,7 @@ namespace KMTGuard.SessionManager
         bool ClientDetached { get; }
         Task ShutdownCompletion { get; }
         bool TryDetachClientTransport(string reason);
+        void ReportMalformedPacket(ushort opcode, string direction, string reason);
         #region Features
         string PlayerUserID { get; set; }
         bool CharacterGameReady { get; set; }

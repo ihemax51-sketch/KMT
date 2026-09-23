@@ -29,19 +29,19 @@ public interface ISessionData
     DateTime? OfflineStallActivatedAtUtc { get; set; }
     DateTime? OfflineStallDetachedAtUtc { get; set; }
     bool isSilkStall { get; set; }
-    List<int> PlayerTitles { get; set; }
-    Dictionary<int, PlayerTitleColor> PlayerTitleColors { get; set; }
-    Dictionary<int, PlayerIcon> PlayerIcons { get; set; }
+    ConcurrentList<int> PlayerTitles { get; set; }
+    ConcurrentDictionary<int, PlayerTitleColor> PlayerTitleColors { get; set; }
+    ConcurrentDictionary<int, PlayerIcon> PlayerIcons { get; set; }
     ConcurrentDictionary<int, _ItemChest> CharacterChest { get; set; }
     ConcurrentDictionary<int, Guid> PendingChestClaims { get; set; }
-    Dictionary<int, _Achievement> CharacterAchievement { get; set; }
-    Dictionary<int, _AchievementCondition> CharacterAchievementCondition { get; set; }
+    ConcurrentDictionary<int, _Achievement> CharacterAchievement { get; set; }
+    ConcurrentDictionary<int, _AchievementCondition> CharacterAchievementCondition { get; set; }
     DateTime LastAchievementTitleActionUtc { get; set; }
-    Dictionary<int, _NewReverseSavedLocations> CharacterNewReverseSavedLocations { get; set; }
+    ConcurrentDictionary<int, _NewReverseSavedLocations> CharacterNewReverseSavedLocations { get; set; }
 
-    List<uint> CharPetList { get; set; }
+    ConcurrentList<uint> CharPetList { get; set; }
 
-    Dictionary<uint, PetInfo> PetDataDictionary { get; set; }
+    ConcurrentDictionary<uint, PetInfo> PetDataDictionary { get; set; }
 
     int AttendanceDayCount { get; set; }
     DateTime LastAttendanceStateRequestUtc { get; set; }

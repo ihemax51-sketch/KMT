@@ -14,6 +14,7 @@ namespace SilkroadSecurityAPI
 {
     public class Packet
     {
+        private readonly object m_stateLock = new();
         private bool m_isReadOnly;
         private PacketReader m_reader = null!;
         private byte[] m_reader_bytes = null!;
@@ -21,22 +22,22 @@ namespace SilkroadSecurityAPI
 
         public Packet(Packet rhs)
         {
-            Opcode = rhs.Opcode;
-            Encrypted = rhs.Encrypted;
-            Massive = rhs.Massive;
+            ArgumentNullException.ThrowIfNull(rhs);
+            lock (rhs.m_stateLock)
+            {
+                Opcode = rhs.Opcode;
+                Encrypted = rhs.Encrypted;
+                Massive = rhs.Massive;
 
-            m_isReadOnly = rhs.m_isReadOnly;
-            if (!m_isReadOnly)
-            {
-                m_writer = new PacketWriter();
-                m_reader = null!;
-                m_reader_bytes = null!;
-                m_writer.Write(rhs.m_writer.GetBytes());
-            }
-            else
-            {
+                // A copy owns both its byte array and reader cursor.  This is
+                // required when one logical packet is fanned out to sessions
+                // whose send locks complete at different times.
+                byte[] bytes = rhs.m_isReadOnly
+                    ? (byte[])rhs.m_reader_bytes.Clone()
+                    : rhs.m_writer.GetBytes();
+                m_isReadOnly = true;
                 m_writer = null!;
-                m_reader_bytes = rhs.m_reader_bytes;
+                m_reader_bytes = bytes;
                 m_reader = new PacketReader(m_reader_bytes);
             }
         }
@@ -116,24 +117,34 @@ namespace SilkroadSecurityAPI
 
         public byte[] GetBytes()
         {
-            if (m_isReadOnly)
+            lock (m_stateLock)
             {
-                return m_reader_bytes;
-            }
+                if (m_isReadOnly)
+                    return m_reader_bytes;
 
-            return m_writer.GetBytes();
+                return m_writer.GetBytes();
+            }
         }
 
         public void ToReadOnly()
         {
-            if (!m_isReadOnly)
+            lock (m_stateLock)
             {
+                if (m_isReadOnly)
+                    return;
+
                 m_reader_bytes = m_writer.GetBytes();
                 m_reader = new PacketReader(m_reader_bytes);
                 m_writer.Close();
                 m_writer = null!;
                 m_isReadOnly = true;
             }
+        }
+
+        public Packet CreateReadOnlyClone()
+        {
+            ToReadOnly();
+            return new Packet(this);
         }
         public void SkipRead(long count)
         {

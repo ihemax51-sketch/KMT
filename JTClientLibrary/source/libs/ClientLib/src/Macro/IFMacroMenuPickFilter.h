@@ -8,6 +8,7 @@
 #include <IFEdit.h>
 #include "d3dx9math.h"
 #include <map>
+#include <set>
 
 class CIFMacroMenuPickFilter : public CIFWnd
 {
@@ -64,7 +65,9 @@ public:
     CIFCheckBox* DontPickHpMp;
     CIFCheckBox* DontPickVigor;
     void PickWithPet();
-    bool IsPickupCandidate(CIItem* item, int itemUniqueId, const SItemData* data);
+    bool IsRuntimeReady() const;
+    bool IsPickupCandidate(CIItem* item, int itemUniqueId, const SItemData* data,
+                           bool hasEmptySlot, const std::set<int>& mergeableItems);
     bool ShouldPickItem(const SItemData* data) const;
     bool IsDegreeEnabled(int degree) const;
     void SendPickupRequest(bool viaPet, int petUniqueId, int itemUniqueId);

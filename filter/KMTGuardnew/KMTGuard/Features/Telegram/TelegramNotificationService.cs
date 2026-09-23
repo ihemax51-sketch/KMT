@@ -56,9 +56,11 @@ public static class TelegramNotificationService
         }
     }
 
-    public static void Stop()
+    public static void Stop() => StopAsync().GetAwaiter().GetResult();
+
+    public static async Task StopAsync()
     {
-        LifecycleLock.Wait();
+        await LifecycleLock.WaitAsync();
         try
         {
             if (_stopSource == null)
@@ -67,9 +69,10 @@ public static class TelegramNotificationService
             _stopSource.Cancel();
             try
             {
-                _worker?.Wait(TimeSpan.FromSeconds(5));
+                if (_worker != null)
+                    await _worker;
             }
-            catch (AggregateException ex) when (ex.InnerExceptions.All(item => item is OperationCanceledException))
+            catch (OperationCanceledException)
             {
             }
 

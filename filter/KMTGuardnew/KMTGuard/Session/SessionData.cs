@@ -46,18 +46,18 @@ public class SessionData : ISessionData
     public bool OfflineStall { get; set; }
     public DateTime? OfflineStallActivatedAtUtc { get; set; }
     public DateTime? OfflineStallDetachedAtUtc { get; set; }
-    public List<int> PlayerTitles { get; set; }
-    public Dictionary<int, PlayerTitleColor> PlayerTitleColors { get; set; }
-    public Dictionary<int, PlayerIcon> PlayerIcons { get; set; }
+    public ConcurrentList<int> PlayerTitles { get; set; }
+    public ConcurrentDictionary<int, PlayerTitleColor> PlayerTitleColors { get; set; }
+    public ConcurrentDictionary<int, PlayerIcon> PlayerIcons { get; set; }
     public ConcurrentDictionary<int, _ItemChest> CharacterChest { get; set; }
     public ConcurrentDictionary<int, Guid> PendingChestClaims { get; set; }
-    public Dictionary<int, _Achievement> CharacterAchievement { get; set; }
-    public Dictionary<int, _AchievementCondition> CharacterAchievementCondition { get; set; }
+    public ConcurrentDictionary<int, _Achievement> CharacterAchievement { get; set; }
+    public ConcurrentDictionary<int, _AchievementCondition> CharacterAchievementCondition { get; set; }
     public DateTime LastAchievementTitleActionUtc { get; set; } = DateTime.MinValue;
-    public Dictionary<int, _NewReverseSavedLocations> CharacterNewReverseSavedLocations { get; set; }
-    public List<uint> CharPetList { get; set; }
+    public ConcurrentDictionary<int, _NewReverseSavedLocations> CharacterNewReverseSavedLocations { get; set; }
+    public ConcurrentList<uint> CharPetList { get; set; }
 
-    public Dictionary<uint, PetInfo> PetDataDictionary { get; set; }
+    public ConcurrentDictionary<uint, PetInfo> PetDataDictionary { get; set; }
 
     public int AttendanceDayCount { get; set; }
     public DateTime LastAttendanceStateRequestUtc { get; set; } = DateTime.MinValue;

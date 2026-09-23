@@ -54,7 +54,15 @@ namespace KMTGuard.SessionManager
         private long _clientGuardWindowStarted = Environment.TickCount64;
         private long _lastClientActivity = Environment.TickCount64;
         private long _serverEgressBytes;
+        private const int ServerPacketGuardWindowMs = 3_000;
+        private int _serverGuardPacketCount;
+        private int _serverGuardCustomPacketCount;
+        private long _serverGuardBytes;
+        private long _serverGuardWindowStarted = Environment.TickCount64;
+        private int _serverGuardViolations;
         private static int _floodCleanupCounter;
+        private int _malformedPacketCount;
+        private long _malformedWindowStarted = Environment.TickCount64;
 
         public bool IsStopped => Volatile.Read(ref _stopped) != 0;
         public bool ClientDetached => Volatile.Read(ref _clientDetached) != 0;
@@ -129,6 +137,29 @@ namespace KMTGuard.SessionManager
 
             try { _clientTcpClient?.Close(); } catch { }
             try { _serverTcpClient?.Close(); } catch { }
+        }
+
+        public void ReportMalformedPacket(ushort opcode, string direction, string reason)
+        {
+            long now = Environment.TickCount64;
+            if (now - _malformedWindowStarted >= 60_000)
+            {
+                _malformedWindowStarted = now;
+                Interlocked.Exchange(ref _malformedPacketCount, 0);
+            }
+
+            int count = Interlocked.Increment(ref _malformedPacketCount);
+            if (count == 1 || count == 5 || count % 20 == 0)
+            {
+                Log.Warning(
+                    "Malformed packet session={Session} ip={ClientIp} direction={Direction} opcode=0x{Opcode:X4} count={Count}/60s reason={Reason}",
+                    ClientGuid,
+                    ClientIp,
+                    direction,
+                    opcode,
+                    count,
+                    reason);
+            }
         }
 
         public bool TryDetachClientTransport(string reason)
@@ -596,6 +627,22 @@ namespace KMTGuard.SessionManager
                 {
                     TraceEarlyPacket("S->C", packet);
 
+                    if (!TryPassServerPacketGuards(packet, out var guardReason))
+                    {
+                        int violations = Interlocked.Increment(ref _serverGuardViolations);
+                        Log.Warning(
+                            "Blocked server packet opcode=0x{Opcode:X4} size={Size} session={Session} service={Service} reason={Reason} violations={Violations}",
+                            packet.Opcode,
+                            packet.GetBytes().Length,
+                            ClientGuid,
+                            AsyncServer.Service.Name,
+                            guardReason,
+                            violations);
+                        if (violations >= 5)
+                            Stop("repeated unsafe server packets");
+                        continue;
+                    }
+
                     //Log.Warning(2, "Opcode:{Iwa0x" + packet.Opcode.ToString("X") + "}");
                     // ignore handshake
                     if (packet.Opcode == 0x5000 || packet.Opcode == 0x9000 ||
@@ -779,6 +826,59 @@ namespace KMTGuard.SessionManager
 
             return true;
         }
+
+        private bool TryPassServerPacketGuards(Packet packet, out string reason)
+        {
+            reason = string.Empty;
+            int length = packet.GetBytes().Length;
+            ServerType serviceType = AsyncServer.Service.ServerType;
+
+            // Massive character/inventory/guild/party/stall snapshots are a
+            // normal part of vSRO loading.  The Security reassembler already
+            // enforces the 16 MiB hard ceiling; ordinary packets remain much
+            // smaller and receive a tighter independent limit.
+            int maxPacketBytes = packet.Massive ? 16 * 1024 * 1024 : 256 * 1024;
+            if (serviceType == ServerType.DownloadServer)
+                maxPacketBytes = 32 * 1024 * 1024;
+            if (length > maxPacketBytes)
+            {
+                reason = $"packet size {length} exceeds {maxPacketBytes}";
+                return false;
+            }
+
+            long now = Environment.TickCount64;
+            if (now - _serverGuardWindowStarted >= ServerPacketGuardWindowMs)
+            {
+                _serverGuardWindowStarted = now;
+                _serverGuardPacketCount = 0;
+                _serverGuardCustomPacketCount = 0;
+                _serverGuardBytes = 0;
+            }
+
+            _serverGuardPacketCount++;
+            _serverGuardBytes += length;
+            if (IsCustomServerOpcode(packet.Opcode))
+                _serverGuardCustomPacketCount++;
+
+            bool loadingBurst = !CharacterGameReady || packet.Massive;
+            int maxPackets = serviceType == ServerType.DownloadServer ? 30_000 : loadingBurst ? 18_000 : 9_000;
+            long maxBytes = serviceType == ServerType.DownloadServer
+                ? 256L * 1024 * 1024
+                : loadingBurst ? 128L * 1024 * 1024 : 64L * 1024 * 1024;
+            int maxCustomPackets = loadingBurst ? 3_000 : 1_500;
+
+            if (_serverGuardPacketCount > maxPackets)
+                reason = $"packet rate {_serverGuardPacketCount}/{ServerPacketGuardWindowMs}ms";
+            else if (_serverGuardBytes > maxBytes)
+                reason = $"byte rate {_serverGuardBytes}/{ServerPacketGuardWindowMs}ms";
+            else if (_serverGuardCustomPacketCount > maxCustomPackets)
+                reason = $"custom opcode rate {_serverGuardCustomPacketCount}/{ServerPacketGuardWindowMs}ms";
+
+            return reason.Length == 0;
+        }
+
+        private static bool IsCustomServerOpcode(ushort opcode) =>
+            opcode is >= 0x1200 and <= 0x22FF or >= 0x5000 and <= 0x50FF;
 
         private static bool IsCustomClientOpcode(ushort opcode)
         {

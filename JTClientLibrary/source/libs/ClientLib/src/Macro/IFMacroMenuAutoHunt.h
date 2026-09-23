@@ -72,6 +72,8 @@ public:
     bool MacroAutoTownTimerRunning;
     bool AutoHuntTimerRunning;
     bool MacroAutoInviteRunning;
+    unsigned long m_lastDeathRecoveryTick;
+    bool m_deathRecoveryPending;
 
     CIFCheckBox* AutoPartyInviteCheckBox;
     CIFCheckBox* AutoPartyAcceptCheckBox;
@@ -101,6 +103,7 @@ public:
     void ActivateTabPage(BYTE page);
     void LoadSetting();
     bool IsUniqueTargetEnabled() const;
+    bool IsRuntimeReady() const;
 
     void SaveButton();
     void CancelBtn();
