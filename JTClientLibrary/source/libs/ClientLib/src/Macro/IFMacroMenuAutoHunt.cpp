@@ -1,5 +1,6 @@
 #include "IFMacroMenuAutoHunt.h"
 #include <support/SafePath.h>
+#include "MacroSafety.h"
 #include "Game.h"
 #include "IFMacroMenu.h"
 #include <BSLib/Debug.h>
@@ -182,6 +183,8 @@ int CIFMacroMenuAutoHunt::Func_4(int a2) {
 CIFMacroMenuAutoHunt::CIFMacroMenuAutoHunt(void) {
     BS_DEBUG_LOW(">" __FUNCTION__);
     m_pTabsSecond = 0;
+    AutoPartyInviteCheckBox = GDR_AUTO_REFORM_PARTY = DONT_ATTACK_MONSTERCB = 0;
+    AutoResPtMembersCB = AutoReturnHPMPLessCheckbox = AutoUseNasrun = AutoUseNasrunIgnore = 0;
     AutoPartyMemberList = std::map<std::n_wstring, std::n_wstring>();
     SelectedPartyMemberName = std::n_wstring();
     Macro_AutoHunt = false;
@@ -191,6 +194,8 @@ CIFMacroMenuAutoHunt::CIFMacroMenuAutoHunt(void) {
     MacroAutoTownTimerRunning = false;
     AutoHuntTimerRunning = false;
     MacroAutoInviteRunning = false;
+    m_lastDeathRecoveryTick = 0;
+    m_deathRecoveryPending = false;
     UniqueTargetCheckBox = 0;
 }
 CIFMacroMenuAutoHunt::~CIFMacroMenuAutoHunt(void) {
@@ -1028,6 +1033,16 @@ void CIFMacroMenuAutoHunt::StartAutoHunt()
     if (!g_pCGInterface)
         return;
 
+    if (!IsRuntimeReady())
+    {
+        Macro_AutoHunt = false;
+        g_pCGInterface->KillTimer(START_AUTO_HUNT);
+        g_pCGInterface->KillTimer(START_BACK_TOWN);
+        g_pCGInterface->KillTimer(STARTED_INVITE_PLAYER_PARTY);
+        AutoHuntTimerRunning = MacroAutoTownTimerRunning = MacroAutoInviteRunning = false;
+        return;
+    }
+
     if (!Macro_AutoHunt)
     {
         g_pCGInterface->KillTimer(START_AUTO_HUNT);
@@ -1088,10 +1103,20 @@ void CIFMacroMenuAutoHunt::StartAutoHunt()
     if(!MacroAutoTownTimerRunning)
     {
         MacroAutoTownTimerRunning = true;
-        g_pCGInterface->StartTimer(START_BACK_TOWN, AutoHuntSetting[BACK_HOUR_SETTING] * 3600000);
+        const int configuredHours = AutoHuntSetting[BACK_HOUR_SETTING];
+        const int safeHours = (configuredHours == 1 || configuredHours == 3 ||
+            configuredHours == 5 || configuredHours == 10 || configuredHours == 24)
+            ? configuredHours : 1;
+        AutoHuntSetting[BACK_HOUR_SETTING] = safeHours;
+        g_pCGInterface->StartTimer(START_BACK_TOWN, (unsigned long)safeHours * 3600000UL);
     }
     if(g_pMyPlayerObj->CHARACTER_STATUS == Dead)
     {
+        const unsigned long now = GetTickCount();
+        if (m_deathRecoveryPending && now - m_lastDeathRecoveryTick < 5000UL)
+            return;
+        m_deathRecoveryPending = true;
+        m_lastDeathRecoveryTick = now;
         if(AutoHuntSetting[RETURN_TOWN_SETTING] == eTownSetting::RES_SCROLL) // Use Res Scroll
         {
 
@@ -1118,6 +1143,8 @@ void CIFMacroMenuAutoHunt::StartAutoHunt()
 
         }
     }
+
+    m_deathRecoveryPending = false;
 
     if(AutoPartyInviteCheckBox->GetCheckedState_MAYBE())
     {
@@ -1307,6 +1334,11 @@ D3DVECTOR CIFMacroMenuAutoHunt::GetLocation() const {
 bool CIFMacroMenuAutoHunt::IsUniqueTargetEnabled() const {
     return UniqueTargetCheckBox && UniqueTargetCheckBox->GetCheckedState_MAYBE();
 }
+bool CIFMacroMenuAutoHunt::IsRuntimeReady() const {
+    return AutoPartyInviteCheckBox && GDR_AUTO_REFORM_PARTY &&
+           DONT_ATTACK_MONSTERCB && AutoResPtMembersCB &&
+           AutoReturnHPMPLessCheckbox && AutoUseNasrun && AutoUseNasrunIgnore;
+}
 #include <sstream>
 void CIFMacroMenuAutoHunt::SaveButton(){
 
@@ -1430,11 +1462,14 @@ void CIFMacroMenuAutoHunt::SaveButton(){
     CreateDirectoryA(settingDirectory, NULL);
 
     char buffer3[0x200];
-    if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_Macro.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+    const std::n_wstring characterName = KmtSanitizeMacroCharacterName(
+        g_pMyPlayerObj ? g_pMyPlayerObj->GetCharName().c_str() : L"");
+    if (characterName.empty() ||
+        !KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_Macro.txt", theApp.GetWorkingDir(), characterName.c_str()))
         return;
 
-// DosyayÄ± yazma modunda aÃ§
-    FILE *file3 = fopen(buffer3, "w");
+    char temporaryPath[0x240];
+    FILE *file3 = KmtOpenAtomicTextFile(buffer3, temporaryPath, sizeof(temporaryPath));
     if (file3 != NULL) {
         // Veri kontrolÃ¼ ve dosyaya yazma
 
@@ -1491,7 +1526,7 @@ void CIFMacroMenuAutoHunt::SaveButton(){
                 fprintf(file3, "Auto party member %d: %ls\n",i, it->first.c_str());
             }
         }
-        fclose(file3); // DosyayÄ± kapat
+        KmtCommitAtomicTextFile(file3, temporaryPath, buffer3);
         //printf("Veri dosyaya baÅŸarÄ±yla yazÄ±ldÄ±: %s", buffer3);
     }
 

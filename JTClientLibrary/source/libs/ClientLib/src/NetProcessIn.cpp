@@ -32,6 +32,7 @@
 #include <CustomInterface/IFSoxEffect.h>
 #include <Macro/IFMacroMenu.h>
 #include <Macro/IFMacro.h>
+#include <Macro/MacroSafety.h>
 #include <MacroAlchemy/IFAlchemyMacro.h>
 #include <GlobalItemLinking/GlobalItemLinking.h>
 #include <CustomInterface/IFKillCounter.h>
@@ -5999,18 +6000,28 @@ void tokenizeLine(const wchar_t* line, std::vector<int>& values) {
     }
 }
 
+static void DispatchNative3305(CNetProcessIn* process, CMsgStreamBuffer& msg)
+{
+    msg.m_currentReadBytes = 0;
+    reinterpret_cast<void (__thiscall *)(CNetProcessIn *, CMsgStreamBuffer &)>(0x0087FDD0)(process, msg);
+}
+
 void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
     if(m_Settings->EnableMacro)
     {
         if (!m_Player->FirstSpawn) {
             if (g_pMyPlayerObj != NULL) {
 
-                if (!g_pCGInterface)
+                if (!g_pCGInterface) {
+                    DispatchNative3305(this, msg);
                     return;
+                }
                 CIFSettings* setting = g_pCGInterface->m_IRM.GetResObj<CIFSettings>(SettingsWndID, 1);
                 char buffersetting[0x200];
-                if (!setting || !KmtFormatPath(buffersetting, sizeof(buffersetting), "%s\\Setting\\Client_Extra.txt", theApp.GetWorkingDir()))
+                if (!setting || !KmtFormatPath(buffersetting, sizeof(buffersetting), "%s\\Setting\\Client_Extra.txt", theApp.GetWorkingDir())) {
+                    DispatchNative3305(this, msg);
                     return;
+                }
 
                 FILE *filesettings = fopen(buffersetting, "r");
                 if (filesettings != NULL) {
@@ -6051,23 +6062,43 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
 
                 CIFMacroMenu* CustomMacro = g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1);
                 if (!CustomMacro || !CustomMacro->AutoPotionSlot || !CustomMacro->AutoSkillSlot ||
-                    !CustomMacro->AutoHuntSlot || !CustomMacro->PickupFilterSlot)
+                    !CustomMacro->AutoHuntSlot || !CustomMacro->PickupFilterSlot || !CustomMacro->AutoScrollSlot ||
+                    !CustomMacro->AutoPotionSlot->IsRuntimeReady() ||
+                    !CustomMacro->AutoSkillSlot->IsUiReady() ||
+                    !CustomMacro->AutoHuntSlot->IsRuntimeReady() ||
+                    !CustomMacro->PickupFilterSlot->IsRuntimeReady()) {
+                    DispatchNative3305(this, msg);
                     return;
+                }
+                const std::n_wstring macroCharacterName =
+                    KmtSanitizeMacroCharacterName(g_pMyPlayerObj->GetCharName().c_str());
+                if (macroCharacterName.empty()) {
+                    DispatchNative3305(this, msg);
+                    return;
+                }
                 CustomMacro->AutoPotionSlot->ActivateTabPage(0);
                 CustomMacro->AutoSkillSlot->ActivateTabPage(0);
                 CustomMacro->AutoHuntSlot->ActivateTabPage(0);
                 CustomMacro->PickupFilterSlot->ActivateTabPage(0);
 
                 char buffer3[0x200];
-                if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_Macro.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+                if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_Macro.txt", theApp.GetWorkingDir(), macroCharacterName.c_str())) {
+                    DispatchNative3305(this, msg);
                     return;
+                }
 
                 int MinLevel = 0;
                 int MaxLevel = 0;
                 std::n_wstring Title = std::n_wstring();
 
+                // Character-scoped settings never inherit data from the previous
+                // character when a file is absent or contains no valid records.
+                CustomMacro->AutoHuntSlot->AutoPartyMemberList.clear();
+                CustomMacro->AutoSkillSlot->PartyBuffList.clear();
+
                 FILE *file3 = fopen(buffer3, "r");
                 if (file3 != NULL) {
+                    std::map<std::n_wstring, std::n_wstring> loadedPartyMembers;
                     wchar_t line[512];
                     while (fgetws(line, sizeof(line) / sizeof(wchar_t), file3) != NULL) {
                         int value = 0;
@@ -6088,27 +6119,28 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                         }
                         else if (wcsstr(line, L"Radius: ") != NULL) {
                             if (swscanf(line, L"Radius: %d", &value) == 1) {
-                                g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::RADUIS_SETTING] = value;
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::RADUIS_SETTING] = KmtClampMacroSetting(value, 10, 5000, 100);
                             }
                         }
                         else if (wcsstr(line, L"Hwan setting: ") != NULL) {
                             if (swscanf(line, L"Hwan setting: %d", &value) == 1) {
-                                g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::ZERK_SETTING] = value;
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::ZERK_SETTING] = KmtClampMacroSetting(value, 1, 3, 3);
                             }
                         }
                         else if (wcsstr(line, L"Return town setting: ") != NULL) {
                             if (swscanf(line, L"Return town setting: %d", &value) == 1) {
-                                g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::RETURN_TOWN_SETTING] = value;
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::RETURN_TOWN_SETTING] = KmtClampMacroSetting(value, 1, 3, 3);
                             }
                         }
                         else if (wcsstr(line, L"Back town setting: ") != NULL) {
                             if (swscanf(line, L"Back town setting: %d", &value) == 1) {
-                                g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::BACK_HOUR_SETTING] = value;
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::BACK_HOUR_SETTING] =
+                                    (value == 1 || value == 3 || value == 5 || value == 10 || value == 24) ? value : 1;
                             }
                         }
                         else if (wcsstr(line, L"Repair setting: ") != NULL) {
                             if (swscanf(line, L"Repair setting: %d", &value) == 1) {
-                                g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::REPAIR_SETTING] = value;
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::REPAIR_SETTING] = KmtClampMacroSetting(value, 1, 2, 2);
                             }
                         }
                         else if (wcsstr(line, L"Back town when potion less: ") != NULL) {
@@ -6196,16 +6228,17 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                             int memberIndex;
                             wchar_t memberName[256];
                             // "Auto party member " ifadesini ve indeksi bul
-                            if (swscanf(line, L"Auto party member %d: %ls", &memberIndex, memberName) == 2) {
+                            if (swscanf(line, L"Auto party member %d: %255ls", &memberIndex, memberName) == 2) {
                                 // Yeni üyeyi haritaya ekle
-                                g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->AutoPartyMemberList.insert(std::make_pair(memberName, L""));
+                                loadedPartyMembers[memberName] = L"";
                             }
                         }
 
                     }
 
 
-                    g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->LoadSetting();
+                    CustomMacro->AutoHuntSlot->AutoPartyMemberList.swap(loadedPartyMembers);
+                    CustomMacro->AutoHuntSlot->LoadSetting();
 
                     int i = 0;
                     for(std::map<std::n_wstring , std::n_wstring>::iterator  it =  g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->AutoPartyMemberList.begin();
@@ -6229,12 +6262,15 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
 
 
                 char buffer34[0x200];
-                if (!KmtFormatPath(buffer34, sizeof(buffer34), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+                if (!KmtFormatPath(buffer34, sizeof(buffer34), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), macroCharacterName.c_str())) {
+                    DispatchNative3305(this, msg);
                     return;
+                }
 
 
                 FILE *file34 = fopen(buffer34, "r");
                 if (file34 != NULL) {
+                    std::map<std::n_wstring, std::vector<int> > loadedPartyBuffs;
                     wchar_t line[256];
                     while (fgetws(line, sizeof(line) / sizeof(wchar_t), file34) != NULL) {
                         // ":" karakterine kadar olan kısmı anahtar olarak al
@@ -6247,17 +6283,20 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                             std::vector<int> values;
                             tokenizeLine(pos + 1, values);
                             // Anahtar ve değeri eşleştir
-                            g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoSkillSlot->PartyBuffList.insert(std::make_pair(key, values));
+                            loadedPartyBuffs[key] = values;
                         }
                     }
 
                     fclose(file34); // Dosyayı kapat
+                    CustomMacro->AutoSkillSlot->PartyBuffList.swap(loadedPartyBuffs);
                 }
 
                 CIFMacroMenuPickFilter *PickupFilterSlot = CustomMacro->PickupFilterSlot;
                 char buffer35[256];
-                if (!KmtFormatPath(buffer35, sizeof(buffer35), "%s\\Setting\\%ls_PickupFilter.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+                if (!KmtFormatPath(buffer35, sizeof(buffer35), "%s\\Setting\\%ls_PickupFilter.txt", theApp.GetWorkingDir(), macroCharacterName.c_str())) {
+                    DispatchNative3305(this, msg);
                     return;
+                }
                 FILE *file35 = fopen(buffer35, "r");
                 if (file35 != NULL) {
                     char line[256];
@@ -6404,7 +6443,7 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
         msg.m_currentReadBytes = 0;
     }
     DEBUG_PRINT_CALL()
-    reinterpret_cast<void (__thiscall *)(CNetProcessIn *, CMsgStreamBuffer &)>(0x0087FDD0)(this, msg);
+    DispatchNative3305(this, msg);
 }
 
 void CNetProcessIn::OnB302(CMsgStreamBuffer &msg) {

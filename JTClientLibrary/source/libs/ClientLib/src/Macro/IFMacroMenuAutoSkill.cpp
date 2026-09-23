@@ -1,5 +1,6 @@
 #include "IFMacroMenuAutoSkill.h"
 #include <support/SafePath.h>
+#include "MacroSafety.h"
 #include "Game.h"
 #include "IFMacroMenu.h"
 #include <BSLib/Debug.h>
@@ -256,6 +257,10 @@ GFX_END_MESSAGE_MAP()
 CIFMacroMenuAutoSkill::CIFMacroMenuAutoSkill(void) {
     BS_DEBUG_LOW(">" __FUNCTION__);
     m_pTabsSecond = 0;
+    memset(skillslots, 0, sizeof(skillslots));
+    memset(buffslots, 0, sizeof(buffslots));
+    memset(m_PartySlot, 0, sizeof(m_PartySlot));
+    SkillWeaponSlot = BuffWeaponSlot = SkillShieldSlot = BuffShieldSlot = 0;
     PartyBuffList = std::map<std::n_wstring, std::vector<int>>();
     SelectedPartyMemberName = std::n_wstring();
     Macro_AutoSkill = false;
@@ -989,11 +994,14 @@ void CIFMacroMenuAutoSkill::SaveButton(){
     CreateDirectoryA(settingDirectory, NULL);
 
     char buffer3[0x200];
-    if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+    const std::n_wstring characterName = KmtSanitizeMacroCharacterName(
+        g_pMyPlayerObj ? g_pMyPlayerObj->GetCharName().c_str() : L"");
+    if (characterName.empty() ||
+        !KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), characterName.c_str()))
         return;
 
-// DosyayÄ± yazma modunda aÃ§
-    FILE *file = fopen(buffer3, "w");
+    char temporaryPath[0x240];
+    FILE *file = KmtOpenAtomicTextFile(buffer3, temporaryPath, sizeof(temporaryPath));
     if (file != NULL) {
         std::set<int> seenIDs; // Tekrar eden ID'leri izlemek iÃ§in kÃ¼me oluÅŸtur
 
@@ -1014,11 +1022,20 @@ void CIFMacroMenuAutoSkill::SaveButton(){
 
             seenIDs.insert(uniqueValues.begin(), uniqueValues.end());
         }
-        std::fclose(file); // DosyayÄ± kapat
+        KmtCommitAtomicTextFile(file, temporaryPath, buffer3);
     }
 }
 void CIFMacroMenuAutoSkill::CancelButton(){
     g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(1355, 1)->ShowGWnd(false);
+}
+
+bool CIFMacroMenuAutoSkill::IsUiReady() const
+{
+    if (!SkillWeaponSlot || !BuffWeaponSlot || !SkillShieldSlot || !BuffShieldSlot)
+        return false;
+    for (int i = 0; i < 24; ++i)
+        if (!skillslots[i] || !buffslots[i]) return false;
+    return true;
 }
 
 bool CIFMacroMenuAutoSkill::IsAutoSkillRuntimeReady()
@@ -1477,6 +1494,14 @@ int CIFMacroMenuAutoSkill::FindAttackSkillSlot()
 
 void CIFMacroMenuAutoSkill::StartAutoSkill()
 {
+    if (!IsUiReady())
+    {
+        Macro_AutoSkill = false;
+        AutoSkillTimerRunning = false;
+        ResetSelectedTarget();
+        if (g_pCGInterface) g_pCGInterface->KillTimer(START_AUTO_SKILL);
+        return;
+    }
     if (!AutoSkillTimerRunning)
     {
         AutoSkillTimerRunning = true;

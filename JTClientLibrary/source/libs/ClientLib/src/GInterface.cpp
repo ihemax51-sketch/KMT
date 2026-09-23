@@ -270,6 +270,29 @@ void CGInterface::OnTimerIMPL(int timerId) {
             KillTimer(timerId);
             return;
         }
+
+        bool featureUiReady = true;
+        if ((timerId >= HP_TIMER && timerId <= PET_RES_TIMER) ||
+            timerId == START_AUTO_POTION)
+            featureUiReady = macroMenu->AutoPotionSlot->IsRuntimeReady();
+        if (timerId == START_AUTO_SKILL)
+            featureUiReady = macroMenu->AutoSkillSlot->IsUiReady();
+        if (timerId == START_AUTO_HUNT || timerId == START_BACK_TOWN ||
+            timerId == STARTED_INVITE_PLAYER_PARTY)
+            featureUiReady = macroMenu->AutoHuntSlot->IsRuntimeReady();
+        if (timerId == START_PICK_PET_TIMER)
+            featureUiReady = macroMenu->PickupFilterSlot->IsRuntimeReady();
+        if (!featureUiReady)
+        {
+            macroMenu->AutoPotionSlot->Macro_AutoPotion = false;
+            macroMenu->AutoSkillSlot->Macro_AutoSkill = false;
+            macroMenu->AutoHuntSlot->Macro_AutoHunt = false;
+            macroMenu->PickupFilterSlot->Macro_PetFilter = false;
+            macroMenu->AutoScrollSlot->Macro_AutoScroll = false;
+            SuspendMacroAutomationForWorldTransition();
+            KillTimer(timerId);
+            return;
+        }
     }
 
     if (isMacroTimer && !IsMacroWorldReady())
