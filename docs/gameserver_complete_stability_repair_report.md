@@ -96,7 +96,11 @@ Malformed client input is counted per live Game ID in a bounded 8,192-entry tabl
 
 `gameserver/tests/ValidateGameServerStabilityRepair.py` checks entitlement/location gates, cooldown/token/replay architecture, DPS time slicing and continuation, bounded top-N selection, telemetry queue/worker isolation, synchronized authentication, independent SQL connection/statement ownership, module pinning, malformed-session tracking, and preservation of Item Linking.
 
+<<<<<<< ours
 The repair passed all 13 source architecture checks and the complete GameServer add-on built successfully with the supported Windows toolchain. The resulting package was staged through the unified component-build workflow.
+=======
+CMake generation cannot complete on this Linux host because the project requires DirectX and the supported Windows toolchain. No binary was produced or deployed.
+>>>>>>> theirs
 
 ## Remaining risks
 

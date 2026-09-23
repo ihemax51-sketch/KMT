@@ -208,7 +208,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
                 if (session.SessionData.CharacterNewReverseSavedLocations.ContainsKey(locationID))
                 {
-                    session.SessionData.CharacterNewReverseSavedLocations.Remove(locationID);
+                    session.SessionData.CharacterNewReverseSavedLocations.TryRemove(locationID, out _);
                     await DatabaseJobQueue.RunAsync(() =>
                     {
                         try

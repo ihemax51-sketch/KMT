@@ -102,35 +102,40 @@ namespace KMTGuard.Server
                 .Where(s => ServerManager.IsClientDeliveryTarget(s, clientIsReady) &&
                             s.SessionData.WorldID == WorldID &&
                             s.SessionData.WorldLayerID == LayerID);
-            await Task.WhenAll(targets.Select(s => s.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(s => s.SendToClient(packet.CreateReadOnlyClone())));
         }
 
         public async Task BroadcastPacket(Packet packet, ServerType serverType = ServerType.AgentServer, bool clientIsReady = true)
         {
             var targets = ServerManager.AgentSessions
                 .Where(s => ServerManager.IsClientDeliveryTarget(s, clientIsReady));
-            await Task.WhenAll(targets.Select(s => s.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(s => s.SendToClient(packet.CreateReadOnlyClone())));
         }
         public async Task BroadcastPacketToCharName(string CharName, Packet packet, bool clientIsReady = true)
         {
             var targets = ServerManager.AgentSessions
                 .Where(s => ServerManager.IsClientDeliveryTarget(s, clientIsReady) &&
                             s.SessionData.Charname == CharName);
-            await Task.WhenAll(targets.Select(s => s.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(s => s.SendToClient(packet.CreateReadOnlyClone())));
         }
         public async Task BroadcastPacketbyWorldID(int WorldID, Packet packet, bool clientIsReady = true)
         {
             var targets = ServerManager.AgentSessions
                 .Where(s => ServerManager.IsClientDeliveryTarget(s, clientIsReady) &&
                             s.SessionData.WorldID == WorldID);
-            await Task.WhenAll(targets.Select(s => s.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(s => s.SendToClient(packet.CreateReadOnlyClone())));
         }
         public async Task BroadcastPacketbyRegionID(int Region, Packet packet, bool clientIsReady = true)
         {
             var targets = ServerManager.AgentSessions
                 .Where(s => ServerManager.IsClientDeliveryTarget(s, clientIsReady) &&
                             s.SessionData.LatestRegion == Region);
-            await Task.WhenAll(targets.Select(s => s.SendToClient(packet)));
+            packet.ToReadOnly();
+            await Task.WhenAll(targets.Select(s => s.SendToClient(packet.CreateReadOnlyClone())));
         }
         public async Task<bool> TryGetItemInfoAsync(SItemInfoDbRecord stResult, int nCharID, byte btSlotIndex)
         {

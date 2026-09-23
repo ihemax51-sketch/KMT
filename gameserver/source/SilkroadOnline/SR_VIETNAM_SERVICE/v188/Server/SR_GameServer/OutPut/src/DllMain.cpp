@@ -152,6 +152,7 @@ static void RemoveSystemMessageHooks()
 static DWORD InitializeGameServerAddonCore(HMODULE hModule)
 {
         GameServerConsole::Initialize();
+<<<<<<< ours
         HMODULE hKernel32 = GetModuleHandleA("Kernel32.dll");
         fnGetModuleHandleExACompat getModuleHandleExA = hKernel32 == NULL
             ? NULL
@@ -159,6 +160,10 @@ static DWORD InitializeGameServerAddonCore(HMODULE hModule)
                 GetProcAddress(hKernel32, "GetModuleHandleExA"));
         if (getModuleHandleExA == NULL || !getModuleHandleExA(
                 GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+=======
+        if (!GetModuleHandleExA(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+>>>>>>> theirs
                 reinterpret_cast<LPCSTR>(&InitializeGameServerAddonCore),
                 &s_processLifetimeModule))
         {

@@ -31,8 +31,13 @@
 #include <WebViewer/WebViewerConfig.h>
 #include <CustomInterface/IFSoxEffect.h>
 #include <Macro/IFMacroMenu.h>
+<<<<<<< ours
 #include <Macro/IFMacro.h>
 #include <Macro/MacroSafety.h>
+=======
+#include <Macro/IFMacro.h>
+#include <Macro/MacroSafety.h>
+>>>>>>> theirs
 #include <MacroAlchemy/IFAlchemyMacro.h>
 #include <GlobalItemLinking/GlobalItemLinking.h>
 #include <CustomInterface/IFKillCounter.h>
@@ -71,6 +76,7 @@ extern bool g_bCurrentStallUsesSilk;
 #include "GlobalDataManager.h"
 #include "IFMagicStateBoard.h"
 #include "CustomInterface/IFDps.h"
+<<<<<<< ours
 #include "IFChatViewer.h"
 #include "ICMonster.h"
 #include "ICCos.h"
@@ -203,6 +209,140 @@ namespace {
 void StringReplaceAll(std::n_wstring &Value, const std::wstring &From, const std::wstring &To) {
     if (From.empty())
         return;
+=======
+#include "IFChatViewer.h"
+#include "ICMonster.h"
+#include "ICCos.h"
+#include "IFTargetWindow.h"
+#include <support/SafePath.h>
+#include <ClientNet/SafePacketReader.h>
+#ifdef CONFIG_DEBUG_NET_RECEIVE
+#define DEBUG_PRINT_CALL() printf("%s\n", __FUNCTION__);
+#else
+#define DEBUG_PRINT_CALL()
+#endif
+
+namespace {
+struct CMsgStreamReadState {
+    explicit CMsgStreamReadState(const CMsgStreamBuffer &msg)
+        : currentReadBytes(msg.m_currentReadBytes),
+          field0C(msg.field_0xc),
+          field0D(msg.field_0xd),
+          field0E(msg.field_0xe),
+          field0F(msg.field_0xf),
+          node1(msg.m_node1),
+          node2(msg.m_node2) {
+    }
+
+    void Restore(CMsgStreamBuffer &msg) const {
+        msg.m_currentReadBytes = currentReadBytes;
+        msg.field_0xc = field0C;
+        msg.field_0xd = field0D;
+        msg.field_0xe = field0E;
+        msg.field_0xf = field0F;
+        msg.m_node1 = node1;
+        msg.m_node2 = node2;
+    }
+
+private:
+    unsigned int currentReadBytes;
+    unsigned char field0C;
+    unsigned char field0D;
+    unsigned char field0E;
+    unsigned char field0F;
+    CMsgStreamBuffer::SMsgStreamNode *node1;
+    CMsgStreamBuffer::SMsgStreamNode *node2;
+};
+}
+#define DEFAULT_SYSTEM_COLOR 0xFFDBC99B
+
+CNetProcessIn* p_CNetProcessIn = NULL;
+
+namespace {
+    int GetEventSuitClothIdForCurrentPlayer(const CustomDataManager::SEventMapSettings &settings)
+    {
+        if (!g_pMyPlayerObj)
+            return -1;
+
+        const int cape = g_pMyPlayerObj->m_PVPCapeState;
+        if (settings.RegionType == 0)
+        {
+            if (cape == 1)
+                return 3;
+            if (cape == 3 || cape == 4 || cape == 5)
+                return 4;
+            return 0;
+        }
+
+        if (cape == 1)
+            return 3;
+        if (cape == 3)
+            return 4;
+        return 0;
+    }
+
+    void ApplyEventSuitToCurrentPlayer()
+    {
+    }
+
+    void RefreshVisibleTargetHpPercent()
+    {
+        if (g_pCGInterface == NULL)
+            return;
+
+        CIFTargetWindow* targetWindow = g_pCGInterface->m_IRM.GetResObj<CIFTargetWindow>(GDR_TARGETWINDOW, 1);
+        if (targetWindow == NULL || !targetWindow->IsVisible())
+            return;
+
+        if (targetWindow->m_pGDR_TW_COMMONENEMY != NULL && targetWindow->m_pGDR_TW_COMMONENEMY->IsVisible())
+            targetWindow->m_pGDR_TW_COMMONENEMY->RefreshHpPercentText();
+
+        if (targetWindow->m_pGDR_TW_SPECIALMOBWND != NULL && targetWindow->m_pGDR_TW_SPECIALMOBWND->IsVisible())
+            targetWindow->m_pGDR_TW_SPECIALMOBWND->RefreshHpPercentText();
+    }
+
+    void RefreshVisibleTargetHpPercentForObjectHp(unsigned int objectId, unsigned int currentHp)
+    {
+        if (g_pCGInterface == NULL)
+            return;
+
+        CIFTargetWindow* targetWindow = g_pCGInterface->m_IRM.GetResObj<CIFTargetWindow>(GDR_TARGETWINDOW, 1);
+        if (targetWindow == NULL || !targetWindow->IsVisible())
+            return;
+
+        bool refreshed = false;
+        if (targetWindow->m_pGDR_TW_COMMONENEMY != NULL && targetWindow->m_pGDR_TW_COMMONENEMY->IsVisible())
+            refreshed = targetWindow->m_pGDR_TW_COMMONENEMY->RefreshHpPercentTextForObjectHp(objectId, currentHp) || refreshed;
+
+        if (targetWindow->m_pGDR_TW_SPECIALMOBWND != NULL && targetWindow->m_pGDR_TW_SPECIALMOBWND->IsVisible())
+            refreshed = targetWindow->m_pGDR_TW_SPECIALMOBWND->RefreshHpPercentTextForObjectHp(objectId, currentHp) || refreshed;
+
+        if (!refreshed)
+            RefreshVisibleTargetHpPercent();
+    }
+
+    CIFMacroMenu* GetReadyMacroMenu()
+    {
+        if (g_pCGInterface == NULL)
+            return NULL;
+
+        CIFMacroMenu* macroMenu = g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1);
+        if (macroMenu == NULL ||
+            macroMenu->AutoPotionSlot == NULL ||
+            macroMenu->AutoSkillSlot == NULL ||
+            macroMenu->AutoHuntSlot == NULL ||
+            macroMenu->PickupFilterSlot == NULL ||
+            macroMenu->AutoScrollSlot == NULL)
+            return NULL;
+
+        return macroMenu;
+    }
+}
+
+void StringReplaceAll(std::n_wstring &Value, const std::wstring &From, const std::wstring &To) {
+    if (From.empty())
+        return;
+>>>>>>> theirs
     size_t start_pos = 0;
     while ((start_pos = Value.find(From.c_str(), start_pos)) != std::wstring::npos) {
         Value.replace(start_pos, From.length(), To.c_str());
@@ -2107,6 +2247,7 @@ void CNetProcessIn::LoadMacroAutoPotionData(CMsgStreamBuffer &msg)
     }
     msg.FlushRemaining();
 }
+<<<<<<< ours
 void CNetProcessIn::LoadAttendanceReward(CMsgStreamBuffer & msg){
     byte Count;
     msg >> Count;
@@ -2229,6 +2370,130 @@ void CNetProcessIn::LoadAttendanceRewardState(CMsgStreamBuffer & msg){
             }
         }
     }
+=======
+void CNetProcessIn::LoadAttendanceReward(CMsgStreamBuffer & msg){
+    byte Count;
+    msg >> Count;
+
+    CIFDailyLogin* dailyLogin =
+        g_pCGInterface->m_IRM.GetResObj<CIFDailyLogin>(DailyLoginID, 1);
+    if (dailyLogin == NULL) {
+        msg.FlushRemaining();
+        return;
+    }
+
+    dailyLogin->m_RefAttendanceRewards.clear();
+
+    byte i = 0;
+    while (i < Count) {
+        int ID, ItemID, ItemCount, DayCount;
+        msg >> ID;
+        msg >> ItemID;
+        msg >> ItemCount;
+        msg >> DayCount;
+        if (i < 50 && DayCount >= 1 && DayCount <= 35) {
+            CIFDailyLogin::RefAttendanceEventStruct Data = CIFDailyLogin::RefAttendanceEventStruct();
+            Data.ID = ID;
+            Data.ItemID = ItemID;
+            Data.ItemCount = ItemCount;
+            Data.DayCount = DayCount;
+            dailyLogin->m_RefAttendanceRewards.insert((std::make_pair(ID, Data)));
+        }
+        ++i;
+    }
+    dailyLogin->UpdateMenuSize();
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::WebViewerConfig(CMsgStreamBuffer &msg) {
+    SafePacketReader reader(msg);
+    unsigned short count = 0;
+    if (!reader.Read(count) || count > WEBVIEWER_MAX_BUTTONS)
+        return;
+
+    std::vector<SWebViewerButtonConfig> buttons;
+    for(unsigned short i = 0; i < count; ++i) {
+        SWebViewerButtonConfig cfg;
+        cfg.Id = WEBVIEWER_GUIDE_BASE_ID + (int)i;
+        cfg.FrameWidth = 900;
+        cfg.FrameHeight = 620;
+
+        if (!reader.ReadString(cfg.Name, 64) ||
+            !reader.ReadString(cfg.IconPath, 260) ||
+            !reader.ReadString(cfg.Url, 2048) ||
+            !reader.Read(cfg.FrameWidth) || !reader.Read(cfg.FrameHeight))
+            return;
+
+        if(cfg.FrameWidth < 320) cfg.FrameWidth = 320;
+        if(cfg.FrameHeight < 240) cfg.FrameHeight = 240;
+        if(cfg.FrameWidth > 1200) cfg.FrameWidth = 1200;
+        if(cfg.FrameHeight > 900) cfg.FrameHeight = 900;
+
+        if(cfg.Name.empty() || cfg.IconPath.empty() || cfg.Url.empty())
+            continue;
+
+        cfg.WideName.assign(cfg.Name.begin(), cfg.Name.end());
+        cfg.WideUrl.assign(cfg.Url.begin(), cfg.Url.end());
+        buttons.push_back(cfg);
+    }
+
+    if(g_pCGInterface != NULL && g_pCGInterface->GetAlarmManager() != NULL) {
+        for(int i = 0; i < WEBVIEWER_MAX_BUTTONS; ++i) {
+            g_pCGInterface->GetAlarmManager()->RemoveGuide(WEBVIEWER_GUIDE_BASE_ID + i);
+        }
+    }
+
+    CWebViewerConfig::SetRuntimeButtons(buttons);
+
+    if(g_pCGInterface == NULL || g_pCGInterface->GetAlarmManager() == NULL)
+        return;
+
+    if(!m_Settings->ShowGuideWebViewer) {
+        g_pCGInterface->GetAlarmManager()->PrepareGuides();
+        return;
+    }
+
+    for(int i = 0; i < CWebViewerConfig::GetCount(); ++i) {
+        const SWebViewerButtonConfig* cfg = CWebViewerConfig::GetByIndex(i);
+        if(cfg == NULL)
+            continue;
+        g_pCGInterface->GetAlarmManager()->CreateGuideIcon(cfg->Id);
+    }
+    g_pCGInterface->GetAlarmManager()->PrepareGuides();
+}
+
+void CNetProcessIn::LoadAttendanceRewardState(CMsgStreamBuffer & msg){
+    BYTE sCount;
+    msg >> sCount;
+
+    CIFDailyLogin* dailyLogin =
+        g_pCGInterface->m_IRM.GetResObj<CIFDailyLogin>(DailyLoginID, 1);
+    if (dailyLogin == NULL) {
+        msg.FlushRemaining();
+        return;
+    }
+
+    for (int j = 0; j < 50; ++j)
+    {
+        if (dailyLogin->rewardslot[j] != NULL)
+            dailyLogin->rewardslot[j]->OpenReceiveButton(false);
+    }
+
+    int i = 0;
+    while (i < sCount) {
+        i++;
+        int RefRewardID;
+        msg >> RefRewardID;
+        for (int x = 0; x < 50; ++x)
+        {
+            if(dailyLogin->rewardslot[x] != NULL &&
+               dailyLogin->rewardslot[x]->RefRewardID == RefRewardID)
+            {
+                dailyLogin->rewardslot[x]->OpenReceiveButton(true);
+            }
+        }
+    }
+>>>>>>> theirs
 
     msg.FlushRemaining();
 }
@@ -2646,6 +2911,7 @@ void CNetProcessIn::LoadChest(CMsgStreamBuffer &msg)
 
         msg >> ID >> ItemID >> Quantity >> Date >> Type >> Plus;
 
+<<<<<<< ours
         chest->AddSnapshotItem(
             ID, ItemID, Quantity, TO_NWSTRING(Date), TO_NWSTRING(Type), Plus);
     }
@@ -3045,6 +3311,407 @@ void CNetProcessIn::PvpChallengePacket(CMsgStreamBuffer &msg)
 void CNetProcessIn::DeactivateTag(CMsgStreamBuffer &msg) {
     std::n_string CharName167;
     msg >> CharName167;
+=======
+        chest->AddSnapshotItem(
+            ID, ItemID, Quantity, TO_NWSTRING(Date), TO_NWSTRING(Type), Plus);
+    }
+    chest->EndSnapshot();
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::LoadChestV2(CMsgStreamBuffer &msg)
+{
+    CIFChest* chest = g_pCGInterface
+        ? g_pCGInterface->m_IRM.GetResObj<CIFChest>(ChestID, 1) : NULL;
+    if (!chest || msg.m_currentReadBytes >= msg.m_availableBytesForReading) {
+        msg.FlushRemaining();
+        return;
+    }
+
+    byte phase;
+    msg >> phase;
+
+    if (phase == 0) {
+        if (msg.m_availableBytesForReading - msg.m_currentReadBytes < sizeof(int)) {
+            msg.FlushRemaining();
+            return;
+        }
+
+        int expectedCount;
+        msg >> expectedCount;
+        if (expectedCount < 0 || expectedCount > 100000) {
+            msg.FlushRemaining();
+            return;
+        }
+        chest->BeginSnapshot(expectedCount);
+    } else if (phase == 1) {
+        if (msg.m_currentReadBytes >= msg.m_availableBytesForReading) {
+            msg.FlushRemaining();
+            return;
+        }
+
+        byte count;
+        msg >> count;
+        if (count > 50) {
+            msg.FlushRemaining();
+            return;
+        }
+
+        for (int i = 0; i < count; ++i) {
+            const unsigned int remaining =
+                msg.m_currentReadBytes <= msg.m_availableBytesForReading
+                    ? msg.m_availableBytesForReading - msg.m_currentReadBytes : 0;
+            if (remaining < sizeof(int) * 3 + sizeof(unsigned short) * 2 + sizeof(byte)) {
+                msg.FlushRemaining();
+                return;
+            }
+
+            int ID;
+            int ItemID;
+            int Quantity;
+            std::n_string Date;
+            std::n_string Type;
+            byte Plus;
+            msg >> ID >> ItemID >> Quantity >> Date >> Type >> Plus;
+            chest->AddSnapshotItem(
+                ID, ItemID, Quantity, TO_NWSTRING(Date), TO_NWSTRING(Type), Plus);
+        }
+    } else if (phase == 2) {
+        chest->EndSnapshot();
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::LoadLuckySpinRewards(CMsgStreamBuffer &msg)
+{
+    SafePacketReader reader(msg);
+    int count;
+    if (!reader.ReadCount(count, 256))
+        return;
+    std::vector<CustomDataManager::LuckySpinReward> rewards;
+
+    for (int i = 0; i < count; ++i) {
+        CustomDataManager::LuckySpinReward reward;
+        if (!reader.Read(reward.ItemID) || !reader.Read(reward.Amount))
+            return;
+        if (reward.ItemID > 0 && reward.Amount > 0) {
+            rewards.push_back(reward);
+        }
+    }
+    m_CustomDataManager->LuckySpinRewards.swap(rewards);
+
+    CIFLuckySpinWnd* window = g_pCGInterface
+        ? g_pCGInterface->GetGuiFromList<CIFLuckySpinWnd>(LUCKY_SPIN_WINDOW_ID) : NULL;
+    if (window && window->IsVisible()) {
+        window->RefreshRewards();
+    }
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::LuckySpinResult(CMsgStreamBuffer &msg)
+{
+    int winningSlot;
+    msg >> winningSlot;
+    CIFLuckySpinWnd* window = g_pCGInterface->GetGuiFromList<CIFLuckySpinWnd>(LUCKY_SPIN_WINDOW_ID);
+    if (window) {
+        window->StartSpin(winningSlot);
+    }
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::TradeSellCaptchaRequest(CMsgStreamBuffer &msg)
+{
+    int code;
+    int timeoutSeconds;
+    int attemptsRemaining = 0;
+    byte retry = 0;
+    msg >> code >> timeoutSeconds;
+
+    if (msg.m_availableBytesForReading - msg.m_currentReadBytes >= sizeof(attemptsRemaining)) {
+        msg >> attemptsRemaining;
+    }
+    if (msg.m_availableBytesForReading - msg.m_currentReadBytes >= sizeof(retry)) {
+        msg >> retry;
+    }
+
+    CIFTradeCaptchaWnd* window = g_pCGInterface->GetGuiFromList<CIFTradeCaptchaWnd>(TRADE_SELL_CAPTCHA_WINDOW_ID);
+    if (window) {
+        window->OpenChallenge(code, timeoutSeconds, attemptsRemaining, retry != 0);
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::LoadSpecialOffers(CMsgStreamBuffer &msg)
+{
+    SafePacketReader reader(msg);
+    int count;
+    if (!reader.ReadCount(count, 256))
+        return;
+    std::vector<CustomDataManager::SpecialOfferItem> offers;
+
+    for (int i = 0; i < count; ++i) {
+        CustomDataManager::SpecialOfferItem offer;
+        if (!reader.Read(offer.ID) || !reader.Read(offer.ItemID) ||
+            !reader.Read(offer.ItemCount) || !reader.Read(offer.MainPrice) ||
+            !reader.Read(offer.SalePrice) || !reader.Read(offer.PaymentType) ||
+            !reader.Read(offer.PreviewMode) || !reader.Read(offer.PreviewRefObjID) ||
+            !reader.Read(offer.SortOrder) || !reader.ReadWString(offer.Title, 128) ||
+            !reader.ReadString(offer.PreviewImagePath, 260))
+            return;
+
+        if (offer.ID > 0 && offer.ItemID > 0 && offer.ItemCount > 0 && offer.SalePrice > 0) {
+            offers.push_back(offer);
+        }
+    }
+    m_CustomDataManager->SpecialOffers.swap(offers);
+
+    CIFSpecialOffersWnd* window = g_pCGInterface
+        ? g_pCGInterface->GetGuiFromList<CIFSpecialOffersWnd>(SPECIAL_OFFERS_WINDOW_ID) : NULL;
+    if (window && window->IsVisible()) {
+        window->RefreshOffers();
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::SpecialOfferPurchaseResult(CMsgStreamBuffer &msg)
+{
+    byte success;
+    int offerId;
+    std::n_wstring message;
+    msg >> success;
+    msg >> offerId;
+    msg >> message;
+
+    CIFSpecialOffersWnd* window = g_pCGInterface->GetGuiFromList<CIFSpecialOffersWnd>(SPECIAL_OFFERS_WINDOW_ID);
+    if (window) {
+        window->HandlePurchaseResult(success != 0, offerId, message.c_str());
+    } else {
+        if (success) {
+            g_pCGInterface->ShowMessage_Notice(message);
+        } else {
+            g_pCGInterface->ShowMessage_Warning(message);
+        }
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::LoadKillerAnimations(CMsgStreamBuffer &msg)
+{
+    SafePacketReader reader(msg);
+    int count;
+    int activeId;
+    if (!reader.ReadCount(count, 256) || !reader.Read(activeId))
+        return;
+
+    std::vector<CustomDataManager::KillerAnimation> animations;
+
+    for (int i = 0; i < count; ++i) {
+        CustomDataManager::KillerAnimation animation;
+        byte owned;
+        byte active;
+
+        if (!reader.Read(animation.ID) || !reader.Read(animation.AnimationID) ||
+            !reader.Read(animation.Price) || !reader.Read(animation.PaymentType) ||
+            !reader.Read(animation.SortOrder) || !reader.Read(owned) ||
+            !reader.Read(active) || !reader.ReadWString(animation.DisplayName, 128))
+            return;
+
+        animation.Owned = owned != 0;
+        animation.IsActive = active != 0;
+
+        if (animation.ID > 0 && KillerAnimationPlayer::IsValidAnimationId(animation.AnimationID)) {
+            animations.push_back(animation);
+        }
+    }
+    m_CustomDataManager->KillerAnimations.swap(animations);
+    m_CustomDataManager->ActiveKillerAnimationId = activeId;
+
+    CIFKillerAnimationWnd* window = g_pCGInterface
+        ? g_pCGInterface->GetGuiFromList<CIFKillerAnimationWnd>(KILLER_ANIMATION_WINDOW_ID) : NULL;
+    if (window && window->IsVisible()) {
+        window->RefreshAnimations();
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::KillerAnimationActionResult(CMsgStreamBuffer &msg)
+{
+    byte success;
+    byte action;
+    int animationId;
+    std::n_wstring message;
+
+    msg >> success;
+    msg >> action;
+    msg >> animationId;
+    msg >> message;
+
+    CIFKillerAnimationWnd* window = g_pCGInterface->GetGuiFromList<CIFKillerAnimationWnd>(KILLER_ANIMATION_WINDOW_ID);
+    if (window) {
+        window->HandleActionResult(success != 0, action, animationId, message.c_str());
+    } else {
+        if (success) {
+            g_pCGInterface->ShowMessage_Notice(message);
+        } else {
+            g_pCGInterface->ShowMessage_Warning(message);
+        }
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::TriggerKillerAnimation(CMsgStreamBuffer &msg)
+{
+    unsigned int killerUniqueId;
+    int animationId;
+
+    msg >> killerUniqueId;
+    msg >> animationId;
+
+    if (g_pMyPlayerObj && g_pMyPlayerObj->GetUniqueId() == killerUniqueId) {
+        KillerAnimationPlayer::QueueOnCurrentPlayer(animationId);
+    } else if (g_pMyPlayerObj) {
+        KillerAnimationPlayer::QueueOnPlayerUniqueId(killerUniqueId, animationId);
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::DropLogsResponse(CMsgStreamBuffer &msg)
+{
+    byte success;
+    int totalCount;
+    int page;
+    int pageSize;
+    int rowCount;
+    msg >> success;
+    msg >> totalCount;
+    msg >> page;
+    msg >> pageSize;
+    msg >> rowCount;
+
+    std::vector<DropLogEntry> rows;
+    if (rowCount < 0) {
+        rowCount = 0;
+    }
+    if (rowCount > DROPLOG_VISIBLE_ROWS) {
+        rowCount = DROPLOG_VISIBLE_ROWS;
+    }
+
+    for (int i = 0; i < rowCount; ++i) {
+        DropLogEntry entry;
+        msg >> entry.Player;
+        msg >> entry.ItemCode;
+        msg >> entry.RefObjId;
+        msg >> entry.PlusAmount;
+        msg >> entry.Monster;
+        msg >> entry.Info;
+        msg >> entry.Date;
+        msg >> entry.Location;
+        rows.push_back(entry);
+    }
+
+    CIFDropLogsWnd* window = g_pCGInterface->GetGuiFromList<CIFDropLogsWnd>(DROP_LOGS_WINDOW_ID);
+    if (window) {
+        window->HandleDropLogsResponse(success != 0, totalCount, page, pageSize, rows);
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::MonsterPossibleDropsResponse(CMsgStreamBuffer &msg)
+{
+    byte success;
+    int monsterRefObjId;
+    int rowCount;
+    msg >> success;
+    msg >> monsterRefObjId;
+    msg >> rowCount;
+
+    if (rowCount < 0) {
+        rowCount = 0;
+    }
+    if (rowCount > 900) {
+        rowCount = 900;
+    }
+
+    std::vector<int> itemRefObjIds;
+    itemRefObjIds.reserve(rowCount);
+    for (int i = 0; i < rowCount; ++i) {
+        int itemRefObjId;
+        msg >> itemRefObjId;
+        if (itemRefObjId > 0) {
+            itemRefObjIds.push_back(itemRefObjId);
+        }
+    }
+
+    CIFDropLogWnd* window = g_pCGInterface->GetGuiFromList<CIFDropLogWnd>(DROP_LOG_WINDOW_ID);
+    if (window) {
+        window->HandlePossibleDropsResponse(success != 0, monsterRefObjId, itemRefObjIds);
+    }
+
+    msg.FlushRemaining();
+}
+
+void CNetProcessIn::PvpChallengePacket(CMsgStreamBuffer &msg)
+{
+    byte action;
+    msg >> action;
+
+    if (action == 0) {
+        __int64 matchId;
+        std::n_wstring challengerName;
+        __int64 wagerGold;
+        int timeoutSeconds;
+
+        msg >> matchId;
+        msg >> challengerName;
+        msg >> wagerGold;
+        msg >> timeoutSeconds;
+
+        CIFPvpChallengeAnswerWnd* window = g_pCGInterface->GetGuiFromList<CIFPvpChallengeAnswerWnd>(PVP_CHALLENGE_ANSWER_WINDOW_ID);
+        if (window) {
+            window->OpenRequest(matchId, challengerName.c_str(), wagerGold, timeoutSeconds);
+        }
+    } else if (action == 1) {
+        byte success;
+        std::n_wstring message;
+        msg >> success;
+        msg >> message;
+
+        CIFPvpChallengeWnd* window = g_pCGInterface->GetGuiFromList<CIFPvpChallengeWnd>(PVP_CHALLENGE_WINDOW_ID);
+        if (window) {
+            window->HandleStatus(success != 0, message.c_str());
+        }
+
+        if (g_pCGInterface) {
+            if (success) {
+                g_pCGInterface->ShowMessage_Notice(message);
+            } else {
+                g_pCGInterface->ShowMessage_Warning(message);
+            }
+        }
+    } else if (action == 2) {
+        std::n_wstring message;
+        msg >> message;
+        if (g_pCGInterface) {
+            g_pCGInterface->ShowMessage_Notice(message);
+        }
+    }
+
+    msg.FlushRemaining();
+}
+
+
+void CNetProcessIn::DeactivateTag(CMsgStreamBuffer &msg) {
+    std::n_string CharName167;
+    msg >> CharName167;
+>>>>>>> theirs
 
     std::n_wstring CharName16 = TO_NWSTRING(CharName167);
 
@@ -3423,6 +4090,7 @@ void CNetProcessIn::RankCategories(CMsgStreamBuffer &msg)
         std::n_wstring Category = TO_NWSTRING(Categorys);
 
 
+<<<<<<< ours
         if (ranking)
             ranking->AddCategory(ID, Category);
 
@@ -3478,6 +4146,63 @@ void CNetProcessIn::LoadOwnRank(CMsgStreamBuffer &msg)
     msg.FlushRemaining();
 }
 void CNetProcessIn::RemoveCharacterIconRight(CMsgStreamBuffer &msg)
+=======
+        if (ranking)
+            ranking->AddCategory(ID, Category);
+
+    }
+    if (ranking)
+        ranking->FinishCategories();
+    msg.FlushRemaining();
+}
+void CNetProcessIn::LoadRank(CMsgStreamBuffer &msg)
+{
+    SafePacketReader reader(msg);
+    byte count;
+    if (!reader.Read(count) || count > 100)
+        return;
+
+    CIFDynamicRanking* ranking =
+            g_pCGInterface->m_IRM.GetResObj<CIFDynamicRanking>(DynamicRankingID, 1);
+    if (!ranking)
+        return;
+    std::vector<CIFDynamicRanking::RankStruct> ranks;
+
+    for (byte i = 0; i < count; ++i)
+    {
+        std::n_string charName;
+        std::n_string guildName;
+        int points;
+        if (!reader.ReadString(charName, 64) || !reader.ReadString(guildName, 64) ||
+            !reader.Read(points))
+            return;
+
+        CIFDynamicRanking::RankStruct entry = CIFDynamicRanking::RankStruct();
+        entry.LineNum = i + 1;
+        entry.Charname = TO_NWSTRING(charName).c_str();
+        entry.Guild = TO_NWSTRING(guildName).c_str();
+        entry.Points = Insert(points);
+        ranks.push_back(entry);
+    }
+
+    ranking->RankList.swap(ranks);
+    ranking->UpdateRanks();
+    msg.FlushRemaining();
+}
+void CNetProcessIn::LoadOwnRank(CMsgStreamBuffer &msg)
+{
+    std::n_string charName;
+    int rank;
+    int points;
+    msg >> charName >> rank >> points;
+
+    CIFDynamicRanking* ranking =
+            g_pCGInterface->m_IRM.GetResObj<CIFDynamicRanking>(DynamicRankingID, 1);
+    ranking->UpdateSelfRank(TO_NWSTRING(charName), rank, points);
+    msg.FlushRemaining();
+}
+void CNetProcessIn::RemoveCharacterIconRight(CMsgStreamBuffer &msg)
+>>>>>>> theirs
 {
     std::n_string CharName167;
     msg >> CharName167;
@@ -6000,6 +6725,7 @@ void tokenizeLine(const wchar_t* line, std::vector<int>& values) {
     }
 }
 
+<<<<<<< ours
 static void DispatchNative3305(CNetProcessIn* process, CMsgStreamBuffer& msg)
 {
     msg.m_currentReadBytes = 0;
@@ -6022,6 +6748,30 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                     DispatchNative3305(this, msg);
                     return;
                 }
+=======
+static void DispatchNative3305(CNetProcessIn* process, CMsgStreamBuffer& msg)
+{
+    msg.m_currentReadBytes = 0;
+    reinterpret_cast<void (__thiscall *)(CNetProcessIn *, CMsgStreamBuffer &)>(0x0087FDD0)(process, msg);
+}
+
+void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
+    if(m_Settings->EnableMacro)
+    {
+        if (!m_Player->FirstSpawn) {
+            if (g_pMyPlayerObj != NULL) {
+
+                if (!g_pCGInterface) {
+                    DispatchNative3305(this, msg);
+                    return;
+                }
+                CIFSettings* setting = g_pCGInterface->m_IRM.GetResObj<CIFSettings>(SettingsWndID, 1);
+                char buffersetting[0x200];
+                if (!setting || !KmtFormatPath(buffersetting, sizeof(buffersetting), "%s\\Setting\\Client_Extra.txt", theApp.GetWorkingDir())) {
+                    DispatchNative3305(this, msg);
+                    return;
+                }
+>>>>>>> theirs
 
                 FILE *filesettings = fopen(buffersetting, "r");
                 if (filesettings != NULL) {
@@ -6060,6 +6810,7 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
 
 
 
+<<<<<<< ours
                 CIFMacroMenu* CustomMacro = g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1);
                 if (!CustomMacro || !CustomMacro->AutoPotionSlot || !CustomMacro->AutoSkillSlot ||
                     !CustomMacro->AutoHuntSlot || !CustomMacro->PickupFilterSlot || !CustomMacro->AutoScrollSlot ||
@@ -6076,12 +6827,31 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                     DispatchNative3305(this, msg);
                     return;
                 }
+=======
+                CIFMacroMenu* CustomMacro = g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1);
+                if (!CustomMacro || !CustomMacro->AutoPotionSlot || !CustomMacro->AutoSkillSlot ||
+                    !CustomMacro->AutoHuntSlot || !CustomMacro->PickupFilterSlot || !CustomMacro->AutoScrollSlot ||
+                    !CustomMacro->AutoPotionSlot->IsRuntimeReady() ||
+                    !CustomMacro->AutoSkillSlot->IsUiReady() ||
+                    !CustomMacro->AutoHuntSlot->IsRuntimeReady() ||
+                    !CustomMacro->PickupFilterSlot->IsRuntimeReady()) {
+                    DispatchNative3305(this, msg);
+                    return;
+                }
+                const std::n_wstring macroCharacterName =
+                    KmtSanitizeMacroCharacterName(g_pMyPlayerObj->GetCharName().c_str());
+                if (macroCharacterName.empty()) {
+                    DispatchNative3305(this, msg);
+                    return;
+                }
+>>>>>>> theirs
                 CustomMacro->AutoPotionSlot->ActivateTabPage(0);
                 CustomMacro->AutoSkillSlot->ActivateTabPage(0);
                 CustomMacro->AutoHuntSlot->ActivateTabPage(0);
                 CustomMacro->PickupFilterSlot->ActivateTabPage(0);
 
                 char buffer3[0x200];
+<<<<<<< ours
                 if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_Macro.txt", theApp.GetWorkingDir(), macroCharacterName.c_str())) {
                     DispatchNative3305(this, msg);
                     return;
@@ -6099,6 +6869,25 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                 FILE *file3 = fopen(buffer3, "r");
                 if (file3 != NULL) {
                     std::map<std::n_wstring, std::n_wstring> loadedPartyMembers;
+=======
+                if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_Macro.txt", theApp.GetWorkingDir(), macroCharacterName.c_str())) {
+                    DispatchNative3305(this, msg);
+                    return;
+                }
+
+                int MinLevel = 0;
+                int MaxLevel = 0;
+                std::n_wstring Title = std::n_wstring();
+
+                // Character-scoped settings never inherit data from the previous
+                // character when a file is absent or contains no valid records.
+                CustomMacro->AutoHuntSlot->AutoPartyMemberList.clear();
+                CustomMacro->AutoSkillSlot->PartyBuffList.clear();
+
+                FILE *file3 = fopen(buffer3, "r");
+                if (file3 != NULL) {
+                    std::map<std::n_wstring, std::n_wstring> loadedPartyMembers;
+>>>>>>> theirs
                     wchar_t line[512];
                     while (fgetws(line, sizeof(line) / sizeof(wchar_t), file3) != NULL) {
                         int value = 0;
@@ -6119,28 +6908,49 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                         }
                         else if (wcsstr(line, L"Radius: ") != NULL) {
                             if (swscanf(line, L"Radius: %d", &value) == 1) {
+<<<<<<< ours
                                 CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::RADUIS_SETTING] = KmtClampMacroSetting(value, 10, 5000, 100);
+=======
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::RADUIS_SETTING] = KmtClampMacroSetting(value, 10, 5000, 100);
+>>>>>>> theirs
                             }
                         }
                         else if (wcsstr(line, L"Hwan setting: ") != NULL) {
                             if (swscanf(line, L"Hwan setting: %d", &value) == 1) {
+<<<<<<< ours
                                 CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::ZERK_SETTING] = KmtClampMacroSetting(value, 1, 3, 3);
+=======
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::ZERK_SETTING] = KmtClampMacroSetting(value, 1, 3, 3);
+>>>>>>> theirs
                             }
                         }
                         else if (wcsstr(line, L"Return town setting: ") != NULL) {
                             if (swscanf(line, L"Return town setting: %d", &value) == 1) {
+<<<<<<< ours
                                 CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::RETURN_TOWN_SETTING] = KmtClampMacroSetting(value, 1, 3, 3);
+=======
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::RETURN_TOWN_SETTING] = KmtClampMacroSetting(value, 1, 3, 3);
+>>>>>>> theirs
                             }
                         }
                         else if (wcsstr(line, L"Back town setting: ") != NULL) {
                             if (swscanf(line, L"Back town setting: %d", &value) == 1) {
+<<<<<<< ours
                                 CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::BACK_HOUR_SETTING] =
                                     (value == 1 || value == 3 || value == 5 || value == 10 || value == 24) ? value : 1;
+=======
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::BACK_HOUR_SETTING] =
+                                    (value == 1 || value == 3 || value == 5 || value == 10 || value == 24) ? value : 1;
+>>>>>>> theirs
                             }
                         }
                         else if (wcsstr(line, L"Repair setting: ") != NULL) {
                             if (swscanf(line, L"Repair setting: %d", &value) == 1) {
+<<<<<<< ours
                                 CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::REPAIR_SETTING] = KmtClampMacroSetting(value, 1, 2, 2);
+=======
+                                CustomMacro->AutoHuntSlot->AutoHuntSetting[eAutoHuntSetting::REPAIR_SETTING] = KmtClampMacroSetting(value, 1, 2, 2);
+>>>>>>> theirs
                             }
                         }
                         else if (wcsstr(line, L"Back town when potion less: ") != NULL) {
@@ -6228,17 +7038,28 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                             int memberIndex;
                             wchar_t memberName[256];
                             // "Auto party member " ifadesini ve indeksi bul
+<<<<<<< ours
                             if (swscanf(line, L"Auto party member %d: %255ls", &memberIndex, memberName) == 2) {
                                 // Yeni üyeyi haritaya ekle
                                 loadedPartyMembers[memberName] = L"";
+=======
+                            if (swscanf(line, L"Auto party member %d: %255ls", &memberIndex, memberName) == 2) {
+                                // Yeni üyeyi haritaya ekle
+                                loadedPartyMembers[memberName] = L"";
+>>>>>>> theirs
                             }
                         }
 
                     }
 
 
+<<<<<<< ours
                     CustomMacro->AutoHuntSlot->AutoPartyMemberList.swap(loadedPartyMembers);
                     CustomMacro->AutoHuntSlot->LoadSetting();
+=======
+                    CustomMacro->AutoHuntSlot->AutoPartyMemberList.swap(loadedPartyMembers);
+                    CustomMacro->AutoHuntSlot->LoadSetting();
+>>>>>>> theirs
 
                     int i = 0;
                     for(std::map<std::n_wstring , std::n_wstring>::iterator  it =  g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot->AutoPartyMemberList.begin();
@@ -6262,6 +7083,7 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
 
 
                 char buffer34[0x200];
+<<<<<<< ours
                 if (!KmtFormatPath(buffer34, sizeof(buffer34), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), macroCharacterName.c_str())) {
                     DispatchNative3305(this, msg);
                     return;
@@ -6271,6 +7093,17 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                 FILE *file34 = fopen(buffer34, "r");
                 if (file34 != NULL) {
                     std::map<std::n_wstring, std::vector<int> > loadedPartyBuffs;
+=======
+                if (!KmtFormatPath(buffer34, sizeof(buffer34), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), macroCharacterName.c_str())) {
+                    DispatchNative3305(this, msg);
+                    return;
+                }
+
+
+                FILE *file34 = fopen(buffer34, "r");
+                if (file34 != NULL) {
+                    std::map<std::n_wstring, std::vector<int> > loadedPartyBuffs;
+>>>>>>> theirs
                     wchar_t line[256];
                     while (fgetws(line, sizeof(line) / sizeof(wchar_t), file34) != NULL) {
                         // ":" karakterine kadar olan kısmı anahtar olarak al
@@ -6283,6 +7116,7 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                             std::vector<int> values;
                             tokenizeLine(pos + 1, values);
                             // Anahtar ve değeri eşleştir
+<<<<<<< ours
                             loadedPartyBuffs[key] = values;
                         }
                     }
@@ -6297,6 +7131,22 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                     DispatchNative3305(this, msg);
                     return;
                 }
+=======
+                            loadedPartyBuffs[key] = values;
+                        }
+                    }
+
+                    fclose(file34); // Dosyayı kapat
+                    CustomMacro->AutoSkillSlot->PartyBuffList.swap(loadedPartyBuffs);
+                }
+
+                CIFMacroMenuPickFilter *PickupFilterSlot = CustomMacro->PickupFilterSlot;
+                char buffer35[256];
+                if (!KmtFormatPath(buffer35, sizeof(buffer35), "%s\\Setting\\%ls_PickupFilter.txt", theApp.GetWorkingDir(), macroCharacterName.c_str())) {
+                    DispatchNative3305(this, msg);
+                    return;
+                }
+>>>>>>> theirs
                 FILE *file35 = fopen(buffer35, "r");
                 if (file35 != NULL) {
                     char line[256];
@@ -6435,6 +7285,7 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
 
                 }
                     fclose(file36); // Dosyayı kapat
+<<<<<<< ours
                 }
                 g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoPotionSlot->UpdateSlot();*/
                 m_Player->FirstSpawn = true;
@@ -6448,6 +7299,21 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
 
 void CNetProcessIn::OnB302(CMsgStreamBuffer &msg) {
     DEBUG_PRINT_CALL()
+=======
+                }
+                g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoPotionSlot->UpdateSlot();*/
+                m_Player->FirstSpawn = true;
+            }
+        }
+        msg.m_currentReadBytes = 0;
+    }
+    DEBUG_PRINT_CALL()
+    DispatchNative3305(this, msg);
+}
+
+void CNetProcessIn::OnB302(CMsgStreamBuffer &msg) {
+    DEBUG_PRINT_CALL()
+>>>>>>> theirs
     reinterpret_cast<void (__thiscall *)(CNetProcessIn *, CMsgStreamBuffer &)>(0x00885E50)(this, msg);
 }
 

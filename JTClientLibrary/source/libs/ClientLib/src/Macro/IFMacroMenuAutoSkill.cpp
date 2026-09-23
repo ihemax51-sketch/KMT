@@ -1,6 +1,12 @@
+<<<<<<< ours
 #include "IFMacroMenuAutoSkill.h"
 #include <support/SafePath.h>
 #include "MacroSafety.h"
+=======
+#include "IFMacroMenuAutoSkill.h"
+#include <support/SafePath.h>
+#include "MacroSafety.h"
+>>>>>>> theirs
 #include "Game.h"
 #include "IFMacroMenu.h"
 #include <BSLib/Debug.h>
@@ -254,6 +260,7 @@ GFX_BEGIN_MESSAGE_MAP(CIFMacroMenuAutoSkill, CIFWnd)
                     ONG_COMMAND(99999, &CIFMacroMenuAutoSkill::LoadPartyMembers)
 GFX_END_MESSAGE_MAP()
 
+<<<<<<< ours
 CIFMacroMenuAutoSkill::CIFMacroMenuAutoSkill(void) {
     BS_DEBUG_LOW(">" __FUNCTION__);
     m_pTabsSecond = 0;
@@ -261,6 +268,15 @@ CIFMacroMenuAutoSkill::CIFMacroMenuAutoSkill(void) {
     memset(buffslots, 0, sizeof(buffslots));
     memset(m_PartySlot, 0, sizeof(m_PartySlot));
     SkillWeaponSlot = BuffWeaponSlot = SkillShieldSlot = BuffShieldSlot = 0;
+=======
+CIFMacroMenuAutoSkill::CIFMacroMenuAutoSkill(void) {
+    BS_DEBUG_LOW(">" __FUNCTION__);
+    m_pTabsSecond = 0;
+    memset(skillslots, 0, sizeof(skillslots));
+    memset(buffslots, 0, sizeof(buffslots));
+    memset(m_PartySlot, 0, sizeof(m_PartySlot));
+    SkillWeaponSlot = BuffWeaponSlot = SkillShieldSlot = BuffShieldSlot = 0;
+>>>>>>> theirs
     PartyBuffList = std::map<std::n_wstring, std::vector<int>>();
     SelectedPartyMemberName = std::n_wstring();
     Macro_AutoSkill = false;
@@ -987,6 +1003,7 @@ void CIFMacroMenuAutoSkill::UpdateMenuSize()
     this->MoveGWnd(PosX, PosY);
     BringToFront();
 }
+<<<<<<< ours
 void CIFMacroMenuAutoSkill::SaveButton(){
     char settingDirectory[MAX_PATH];
     if (!KmtFormatPath(settingDirectory, sizeof(settingDirectory), "%s\\Setting", theApp.GetWorkingDir()))
@@ -1002,6 +1019,23 @@ void CIFMacroMenuAutoSkill::SaveButton(){
 
     char temporaryPath[0x240];
     FILE *file = KmtOpenAtomicTextFile(buffer3, temporaryPath, sizeof(temporaryPath));
+=======
+void CIFMacroMenuAutoSkill::SaveButton(){
+    char settingDirectory[MAX_PATH];
+    if (!KmtFormatPath(settingDirectory, sizeof(settingDirectory), "%s\\Setting", theApp.GetWorkingDir()))
+        return;
+    CreateDirectoryA(settingDirectory, NULL);
+
+    char buffer3[0x200];
+    const std::n_wstring characterName = KmtSanitizeMacroCharacterName(
+        g_pMyPlayerObj ? g_pMyPlayerObj->GetCharName().c_str() : L"");
+    if (characterName.empty() ||
+        !KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), characterName.c_str()))
+        return;
+
+    char temporaryPath[0x240];
+    FILE *file = KmtOpenAtomicTextFile(buffer3, temporaryPath, sizeof(temporaryPath));
+>>>>>>> theirs
     if (file != NULL) {
         std::set<int> seenIDs; // Tekrar eden ID'leri izlemek iÃ§in kÃ¼me oluÅŸtur
 
@@ -1022,6 +1056,7 @@ void CIFMacroMenuAutoSkill::SaveButton(){
 
             seenIDs.insert(uniqueValues.begin(), uniqueValues.end());
         }
+<<<<<<< ours
         KmtCommitAtomicTextFile(file, temporaryPath, buffer3);
     }
 }
@@ -1143,6 +1178,129 @@ bool CIFMacroMenuAutoSkill::CheckSkillWeaponAndWear(int Type1, int Type2)
     }
     return false;
 }
+=======
+        KmtCommitAtomicTextFile(file, temporaryPath, buffer3);
+    }
+}
+void CIFMacroMenuAutoSkill::CancelButton(){
+    g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(1355, 1)->ShowGWnd(false);
+}
+
+bool CIFMacroMenuAutoSkill::IsUiReady() const
+{
+    if (!SkillWeaponSlot || !BuffWeaponSlot || !SkillShieldSlot || !BuffShieldSlot)
+        return false;
+    for (int i = 0; i < 24; ++i)
+        if (!skillslots[i] || !buffslots[i]) return false;
+    return true;
+}
+
+bool CIFMacroMenuAutoSkill::IsAutoSkillRuntimeReady()
+{
+    if (!Macro_AutoSkill || !g_pCGInterface || !g_pMyPlayerObj)
+        return false;
+
+    if (g_pMyPlayerObj->CHARACTER_STATUS == Dead ||
+        g_pMyPlayerObj->CHARACTER_STATUS == Stall ||
+        g_pMyPlayerObj->CHARACTER_STATUS == SkillCast ||
+        g_pMyPlayerObj->CHARACTER_STATUS == 0 ||
+        g_pMyPlayerObj->Dead0Stay1Walking2Sit0SkillCast0emotion33Stall12817isridingpet == 17)
+        return false;
+
+    CIFMainPopup* popup = g_pCGInterface->GetMainPopup();
+    if (!popup || !popup->GetInventory() || !popup->GetEquipment() || !popup->GetSkill())
+        return false;
+
+    return true;
+}
+
+const SItemData* CIFMacroMenuAutoSkill::GetEquippedItemData(byte slot)
+{
+    if (!g_pCGInterface)
+        return 0;
+
+    CIFMainPopup* popup = g_pCGInterface->GetMainPopup();
+    if (!popup || !popup->GetEquipment())
+        return 0;
+
+    CSOItem* item = popup->GetEquipment()->GetEquipmentObjectBySlot(slot);
+    if (!item)
+        return 0;
+
+    return item->GetItemData();
+}
+
+void CIFMacroMenuAutoSkill::ResetSelectedTarget()
+{
+    SelectObj = 0;
+    SelectObjUniqueId = 0;
+}
+
+CICharactor* CIFMacroMenuAutoSkill::ResolveSelectedTarget()
+{
+    if (SelectObjUniqueId == 0)
+    {
+        SelectObj = 0;
+        return 0;
+    }
+
+    CICharactor* target = GetCharacterObjectByID_MAYBE(SelectObjUniqueId);
+    if (!target || target->GetUniqueId() == 0 || target->CHARACTER_STATUS == 0x2 || target->CHARACTER_STATUS == 0x18)
+    {
+        ResetSelectedTarget();
+        return 0;
+    }
+
+    SelectObj = target;
+    return target;
+}
+
+void CIFMacroMenuAutoSkill::SetSelectedTarget(CICharactor* target)
+{
+    if (!target)
+    {
+        ResetSelectedTarget();
+        return;
+    }
+
+    SelectObj = target;
+    SelectObjUniqueId = target->GetUniqueId();
+}
+
+bool CIFMacroMenuAutoSkill::CheckBuffWeaponSlot(int Type1, int Type2)
+{
+    const SItemData* configuredWeapon = GetMacroWeaponSlotData(BuffWeaponSlot);
+    if(configuredWeapon == NULL)
+        return false;
+
+    if (configuredWeapon->m_typeId.getTypeID1() == 3 &&
+        configuredWeapon->m_typeId.getTypeID2() == 1 &&
+        configuredWeapon->m_typeId.getTypeID3() == 6 &&
+        (configuredWeapon->m_typeId.getTypeID4() == Type1 ||
+         configuredWeapon->m_typeId.getTypeID4() == Type2))
+    {
+        return TryWearMacroSlot(BuffWeaponSlot, GetEquippedItemData(6));
+    }
+
+    return false;
+}
+bool CIFMacroMenuAutoSkill::CheckSkillWeaponAndWear(int Type1, int Type2)
+{
+    const SItemData* configuredWeapon = GetMacroWeaponSlotData(SkillWeaponSlot);
+    if(configuredWeapon == NULL)
+        return false;
+
+    if (configuredWeapon->m_typeId.getTypeID1() == 3 &&
+        configuredWeapon->m_typeId.getTypeID2() == 1 &&
+        configuredWeapon->m_typeId.getTypeID3() == 6 &&
+        (configuredWeapon->m_typeId.getTypeID4() == Type1 ||
+         configuredWeapon->m_typeId.getTypeID4() == Type2))
+    {
+        return TryWearMacroSlot(SkillWeaponSlot, GetEquippedItemData(6));
+    }
+    return false;
+}
+>>>>>>> theirs
 
 
 bool CIFMacroMenuAutoSkill::CheckSkillShieldCondition()
@@ -1453,6 +1611,7 @@ bool CIFMacroMenuAutoSkill::BuffVeItemUyumu(tid_t CastWeapon1, tid_t CastWeapon2
     }
     return false;
 }
+<<<<<<< ours
 int CIFMacroMenuAutoSkill::FindAttackSkillSlot()
 {
     for (int i = 0; i < 24; i++)
@@ -1530,6 +1689,85 @@ void CIFMacroMenuAutoSkill::StartAutoSkill()
         }
         else
         {
+=======
+int CIFMacroMenuAutoSkill::FindAttackSkillSlot()
+{
+    for (int i = 0; i < 24; i++)
+    {
+        if (!skillslots[i] || !skillslots[i]->m_pMySlot ||
+            !skillslots[i]->m_pMySlot->m_pSlot ||
+            skillslots[i]->m_pMySlot->m_pSlot->GetSlotType() != 73)
+            continue;
+
+        const int skillId = skillslots[i]->m_pMySlot->m_pSlot->GetSkillSlotInDex();
+        if (skillId == 0)
+            continue;
+
+        CSkillData* skillData = g_CGlobalDataManager->GetSkillData(skillId);
+        if (!skillData)
+            continue;
+
+        if (g_pCGInterface->GetSkillCoolTimeManager()->FUN_009bba90(skillId) != 0)
+            continue;
+
+        if (skillData->ReqCast_Weapon1 == 255)
+            return i;
+
+        const SItemData* equippedWeapon = GetEquippedItemData(6);
+        const SItemData* configuredWeapon =
+            SkillWeaponSlot && SkillWeaponSlot->m_pMySlot &&
+            SkillWeaponSlot->m_pMySlot->m_pSlot &&
+            SkillWeaponSlot->m_pMySlot->m_pSlot->ItemInfo
+                ? SkillWeaponSlot->m_pMySlot->m_pSlot->ItemInfo->GetItemData()
+                : 0;
+
+        if (equippedWeapon && configuredWeapon &&
+            equippedWeapon->RefObjectId == configuredWeapon->RefObjectId &&
+            SkillVeItemUyumu(skillData->ReqCast_Weapon1, skillData->ReqCast_Weapon2))
+            return i;
+    }
+    return -1;
+}
+
+void CIFMacroMenuAutoSkill::StartAutoSkill()
+{
+    if (!IsUiReady())
+    {
+        Macro_AutoSkill = false;
+        AutoSkillTimerRunning = false;
+        ResetSelectedTarget();
+        if (g_pCGInterface) g_pCGInterface->KillTimer(START_AUTO_SKILL);
+        return;
+    }
+    if (!AutoSkillTimerRunning)
+    {
+        AutoSkillTimerRunning = true;
+        g_pCGInterface->StartTimer(START_AUTO_SKILL, 250);
+    }
+
+    if (!IsAutoSkillRuntimeReady())
+    {
+        ResetSelectedTarget();
+        return;
+    }
+
+    if (!IsMacroActionReady())
+        return;
+
+    if(AutoSkillTimerRunning)
+    {
+        int NeededBufSlot = FindNeededBuff();
+        if (IsMacroEquipPending())
+            return;
+
+        if(NeededBufSlot != -1)
+        {
+            TryUseMacroSkillSlot(buffslots[NeededBufSlot]);
+            return;
+        }
+        else
+        {
+>>>>>>> theirs
             CIFMacroMenuAutoHunt * AutoHunt = g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoHuntSlot;
             if(AutoHunt->Macro_AutoHunt)
             {

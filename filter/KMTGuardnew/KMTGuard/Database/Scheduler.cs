@@ -49,6 +49,7 @@ public static class Scheduler
     private static readonly SemaphoreSlim ReloadLock = new(1, 1);
     private static readonly SemaphoreSlim ExecutionSlots = new(MaxConcurrentJobs, MaxConcurrentJobs);
     private static readonly ConcurrentDictionary<int, byte> ActiveJobs = new();
+    private static readonly ConcurrentDictionary<int, Task> ActiveWorkers = new();
     private static readonly ConcurrentDictionary<int, DateTime> LocallyClaimedOccurrences = new();
     private static readonly string InstanceId =
         $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
@@ -257,7 +258,10 @@ public static class Scheduler
             if (!ActiveJobs.TryAdd(job.Idx, 0))
                 continue;
 
-            _ = ExecuteJobWorkerAsync(job, occurrence, token);
+            var worker = ExecuteJobWorkerAsync(job, occurrence, token);
+            ActiveWorkers[job.Idx] = worker;
+            if (worker.IsCompleted)
+                ActiveWorkers.TryRemove(job.Idx, out _);
         }
 
         return Task.CompletedTask;
@@ -299,6 +303,7 @@ public static class Scheduler
                 ExecutionSlots.Release();
 
             ActiveJobs.TryRemove(job.Idx, out _);
+            ActiveWorkers.TryRemove(job.Idx, out _);
         }
     }
 
@@ -738,10 +743,25 @@ SELECT CASE WHEN OBJECT_ID(N'dbo.System_Schedule', N'U') IS NOT NULL
                 "Scheduler schema is incomplete. Apply the packaged database updates.");
     }
 
-    public static void Stop()
+    public static void Stop() => StopAsync().GetAwaiter().GetResult();
+
+    public static async Task StopAsync()
     {
         var source = Interlocked.Exchange(ref _stopSource, null);
         source?.Cancel();
-        _schedulerLoop = null;
+        var loop = Interlocked.Exchange(ref _schedulerLoop, null);
+        try
+        {
+            if (loop != null)
+                await loop;
+            await Task.WhenAll(ActiveWorkers.Values);
+        }
+        catch (OperationCanceledException) when (source?.IsCancellationRequested == true)
+        {
+        }
+        finally
+        {
+            source?.Dispose();
+        }
     }
 }

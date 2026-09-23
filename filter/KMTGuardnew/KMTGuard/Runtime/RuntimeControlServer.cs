@@ -1,8 +1,10 @@
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text.Json;
+using System.Collections.Concurrent;
 using KMTGuard.Clientless;
 using KMTGuard.Features.AutoEvents;
+using KMTGuard.Helpers;
 using KMTGuard.Localization;
 using KMTGuard.RuntimeContract;
 using KMTGuard.Server;
@@ -18,7 +20,12 @@ public sealed class RuntimeControlServer : IAsyncDisposable
     private readonly FilterRole _role;
     private readonly Func<Task> _requestShutdown;
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly SemaphoreSlim _connections = new(16, 16);
+    private readonly ConcurrentDictionary<int, Task> _clientTasks = new();
+    private readonly ConcurrentDictionary<string, long> _usedNonces = new(StringComparer.Ordinal);
     private Task? _listenerTask;
+    private int _nextClientTaskId;
+    private const int MaximumRequestCharacters = 64 * 1024;
 
     public RuntimeControlServer(FilterRole role, Func<Task> requestShutdown)
     {
@@ -46,7 +53,19 @@ public sealed class RuntimeControlServer : IAsyncDisposable
                     PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
 
                 await pipe.WaitForConnectionAsync(_shutdown.Token);
-                _ = HandleClientAndDisposeAsync(pipe);
+                await _connections.WaitAsync(_shutdown.Token);
+                int taskId = Interlocked.Increment(ref _nextClientTaskId);
+                var clientTask = HandleClientAndDisposeAsync(pipe);
+                _clientTasks[taskId] = clientTask;
+                _ = clientTask.ContinueWith(
+                    completedTask =>
+                    {
+                        _clientTasks.TryRemove(taskId, out _);
+                        _connections.Release();
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
                 pipe = null;
             }
             catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
@@ -78,12 +97,18 @@ public sealed class RuntimeControlServer : IAsyncDisposable
             {
                 using var reader = new StreamReader(pipe, leaveOpen: true);
                 using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
-                var requestLine = await reader.ReadLineAsync(_shutdown.Token);
+                using var requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
+                requestTimeout.CancelAfter(TimeSpan.FromSeconds(5));
+                var requestLine = await ReadBoundedLineAsync(reader, MaximumRequestCharacters, requestTimeout.Token);
                 if (string.IsNullOrWhiteSpace(requestLine))
                     return;
 
                 var request = JsonSerializer.Deserialize<RuntimeRequest>(requestLine, JsonOptions)
                               ?? throw new InvalidDataException("Invalid runtime control request.");
+                if (!RuntimeRequestAuthentication.Verify(request, TimeSpan.FromSeconds(60)) ||
+                    !_usedNonces.TryAdd(request.Nonce, request.TimestampUnixSeconds))
+                    throw new UnauthorizedAccessException("Runtime control authentication failed.");
+                PruneNonces();
                 var response = await HandleRequestAsync(request);
                 await writer.WriteLineAsync(JsonSerializer.Serialize(response, JsonOptions));
             }
@@ -102,6 +127,42 @@ public sealed class RuntimeControlServer : IAsyncDisposable
                 {
                 }
             }
+        }
+    }
+
+    private static async Task<string?> ReadBoundedLineAsync(
+        StreamReader reader,
+        int maximumCharacters,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new char[1024];
+        var value = new System.Text.StringBuilder();
+        while (value.Length <= maximumCharacters)
+        {
+            int read = await reader.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+            if (read == 0)
+                return value.Length == 0 ? null : value.ToString();
+
+            for (int index = 0; index < read; index++)
+            {
+                if (buffer[index] == '\n')
+                    return value.ToString().TrimEnd('\r');
+                value.Append(buffer[index]);
+                if (value.Length > maximumCharacters)
+                    throw new InvalidDataException("Runtime control request is too large.");
+            }
+        }
+
+        throw new InvalidDataException("Runtime control request is too large.");
+    }
+
+    private void PruneNonces()
+    {
+        long cutoff = DateTimeOffset.UtcNow.AddMinutes(-2).ToUnixTimeSeconds();
+        foreach (var entry in _usedNonces)
+        {
+            if (entry.Value < cutoff)
+                _usedNonces.TryRemove(entry.Key, out _);
         }
     }
 
@@ -299,6 +360,7 @@ FROM
         }
 
         var listenerCount = ServerManager.Servers.Count(server => server.Started);
+        var databaseWorker = DatabaseJobQueue.GetHealth();
         return new RuntimeSnapshot
         {
             Role = _role,
@@ -313,6 +375,10 @@ FROM
             CommandQueueDepth = queueDepth,
             OldestCommandAgeSeconds = oldestCommandAgeSeconds,
             RejectedMassivePackets = SilkroadSecurityAPI.Security.RejectedMassivePackets,
+            DatabaseWorkerQueueDepth = databaseWorker.Depth,
+            DatabaseWorkerDroppedJobs = databaseWorker.DroppedJobs,
+            DatabaseWorkerQueueAgeMs = databaseWorker.LastQueueAgeMs,
+            DatabaseWorkerExecutionMs = databaseWorker.LastExecutionMs,
             CacheLastRefreshUtc = RefManager.CacheLastRefreshUtc
         };
     }
@@ -393,6 +459,9 @@ FROM
             }
         }
 
+        await Task.WhenAll(_clientTasks.Values);
+
+        _connections.Dispose();
         _shutdown.Dispose();
     }
 }

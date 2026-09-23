@@ -2,9 +2,15 @@
 // Created by YUMBUL on 23.06.2024.
 //
 
+<<<<<<< ours
 #include "IFMacroMenuPickFilter.h"
 #include <support/SafePath.h>
 #include "MacroSafety.h"
+=======
+#include "IFMacroMenuPickFilter.h"
+#include <support/SafePath.h>
+#include "MacroSafety.h"
+>>>>>>> theirs
 #include "Game.h"
 #include "IFMacroMenu.h"
 #include <BSLib/Debug.h>
@@ -90,6 +96,7 @@ int CIFMacroMenuPickFilter::Func_4(int a2) {
 }
 
 
+<<<<<<< ours
 CIFMacroMenuPickFilter::CIFMacroMenuPickFilter(void) {
     m_pTabsSecond = 0;
     PickViaPetCheckBox = PickViaCharCheckBox = OnlyRareEquiptsCB = 0;
@@ -97,6 +104,15 @@ CIFMacroMenuPickFilter::CIFMacroMenuPickFilter(void) {
     DontPickElixirsCB = DontPickArrowCB = DontPickReturnCB = DontPickTrashCB = 0;
     DontPickHpMp = DontPickVigor = 0;
     PetPickTimerIsRunning = false;
+=======
+CIFMacroMenuPickFilter::CIFMacroMenuPickFilter(void) {
+    m_pTabsSecond = 0;
+    PickViaPetCheckBox = PickViaCharCheckBox = OnlyRareEquiptsCB = 0;
+    DontPickGoldCB = DontPickAlchemytablesCB = DontPickAlchemyStonesCB = 0;
+    DontPickElixirsCB = DontPickArrowCB = DontPickReturnCB = DontPickTrashCB = 0;
+    DontPickHpMp = DontPickVigor = 0;
+    PetPickTimerIsRunning = false;
+>>>>>>> theirs
     Macro_PetFilter = false;
 }
 CIFMacroMenuPickFilter::~CIFMacroMenuPickFilter(void) {
@@ -284,6 +300,7 @@ bool CIFMacroMenuPickFilter::OnCreate(long ln) {
     return true;
 }
 
+<<<<<<< ours
 void CIFMacroMenuPickFilter::SaveButton(){
     char settingDirectory[MAX_PATH];
     if (!KmtFormatPath(settingDirectory, sizeof(settingDirectory), "%s\\Setting", theApp.GetWorkingDir()))
@@ -299,6 +316,23 @@ void CIFMacroMenuPickFilter::SaveButton(){
 
     char temporaryPath[0x240];
     FILE *file3 = KmtOpenAtomicTextFile(buffer3, temporaryPath, sizeof(temporaryPath));
+=======
+void CIFMacroMenuPickFilter::SaveButton(){
+    char settingDirectory[MAX_PATH];
+    if (!KmtFormatPath(settingDirectory, sizeof(settingDirectory), "%s\\Setting", theApp.GetWorkingDir()))
+        return;
+    CreateDirectoryA(settingDirectory, NULL);
+
+    char buffer3[0x200];
+    const std::n_wstring characterName = KmtSanitizeMacroCharacterName(
+        g_pMyPlayerObj ? g_pMyPlayerObj->GetCharName().c_str() : L"");
+    if (characterName.empty() ||
+        !KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_PickupFilter.txt", theApp.GetWorkingDir(), characterName.c_str()))
+        return;
+
+    char temporaryPath[0x240];
+    FILE *file3 = KmtOpenAtomicTextFile(buffer3, temporaryPath, sizeof(temporaryPath));
+>>>>>>> theirs
     if (file3 != NULL) {
         // Veri kontrolü ve dosyaya yazma
         fprintf(file3, "Enable Pick Filter: %d\n", Macro_PetFilter);
@@ -335,7 +369,11 @@ void CIFMacroMenuPickFilter::SaveButton(){
         fprintf(file3, "Don't Pick HP/MP: %d\n", DontPickHpMp->GetCheckedState_MAYBE());
         fprintf(file3, "Don't Pick Vigor: %d\n", DontPickVigor->GetCheckedState_MAYBE());
 
+<<<<<<< ours
         KmtCommitAtomicTextFile(file3, temporaryPath, buffer3);
+=======
+        KmtCommitAtomicTextFile(file3, temporaryPath, buffer3);
+>>>>>>> theirs
     }
 }
 
@@ -401,6 +439,7 @@ void CIFMacroMenuPickFilter::OnUnknownStuff(){
 undefined1 CIFMacroMenuPickFilter::OnCloseWnd(){
     return CIFWnd::OnCloseWnd();
 }
+<<<<<<< ours
 #define MEMUTIL_READ_BY_PTR_OFFSET(ptr, offset, type) \
 	*(type*)(((uintptr_t)ptr) + offset)
 
@@ -656,3 +695,260 @@ void CIFMacroMenuPickFilter::PickWithPet()
     }
     return;
 }
+=======
+#define MEMUTIL_READ_BY_PTR_OFFSET(ptr, offset, type) \
+	*(type*)(((uintptr_t)ptr) + offset)
+
+static float MacroPickDistance(const D3DVECTOR& a, const D3DVECTOR& b)
+{
+    float dx = a.x - b.x;
+    float dz = a.z - b.z;
+    return sqrt(dx * dx + dz * dz);
+}
+
+bool CIFMacroMenuPickFilter::IsDegreeEnabled(int degree) const
+{
+    CIFCheckBox* boxes[] = {
+        PickDg1CB, PickDg2CB, PickDg3CB, PickDg4CB, PickDg5CB, PickDg6CB,
+        PickDg7CB, PickDg8CB, PickDg9CB, PickDg10CB, PickDg11CB, PickDg12CB,
+        PickDg13CB, PickDg14CB, PickDg15CB, PickDg16CB, PickDg17CB, PickDg18CB
+    };
+    return degree >= 1 && degree <= 18 && boxes[degree - 1] &&
+           boxes[degree - 1]->GetCheckedState_MAYBE();
+}
+
+bool CIFMacroMenuPickFilter::IsRuntimeReady() const
+{
+    return PickViaPetCheckBox && PickViaCharCheckBox && OnlyRareEquiptsCB &&
+           DontPickGoldCB && DontPickAlchemytablesCB && DontPickAlchemyStonesCB &&
+           DontPickElixirsCB && DontPickArrowCB && DontPickReturnCB &&
+           DontPickTrashCB && DontPickHpMp && DontPickVigor;
+}
+
+bool CIFMacroMenuPickFilter::ShouldPickItem(const SItemData* data) const
+{
+    if (!data)
+        return false;
+
+    const bool isGold =
+        data->m_typeId.getTypeID1() == 3 &&
+        data->m_typeId.getTypeID2() == 3 &&
+        data->m_typeId.getTypeID3() == 5 &&
+        data->m_typeId.getTypeID4() == 0;
+    if (isGold)
+        return !DontPickGoldCB->GetCheckedState_MAYBE();
+
+    if (data->m_typeId.getTypeID1() == 3 && data->m_typeId.getTypeID2() == 1)
+    {
+        const int degree = ((data->m_itemClass - 1) / 3) + 1;
+        if (!IsDegreeEnabled(degree))
+            return false;
+        return !OnlyRareEquiptsCB->GetCheckedState_MAYBE() ||
+               data->Rarity == 6 || data->Rarity == 2;
+    }
+
+    if (data->IsAlchemyTablet())
+        return IsDegreeEnabled(data->m_itemClass) &&
+               !DontPickAlchemytablesCB->GetCheckedState_MAYBE();
+
+    if (data->IsMagicStone() || data->IsMagicStone2() || data->IsAttrStone())
+        return IsDegreeEnabled(data->m_itemClass) &&
+               !DontPickAlchemyStonesCB->GetCheckedState_MAYBE();
+
+    if (data->IsElixir())
+        return !DontPickElixirsCB->GetCheckedState_MAYBE();
+    if (data->IsArrow() || data->IsBolt())
+        return !DontPickArrowCB->GetCheckedState_MAYBE();
+    if (data->CodeName == L"ITEM_ETC_SCROLL_RETURN_02")
+        return !DontPickReturnCB->GetCheckedState_MAYBE();
+    if (data->IsAlchemyMaterial())
+        return !DontPickTrashCB->GetCheckedState_MAYBE();
+    if (data->IsHPPotion() || data->IsMPPotion())
+        return !DontPickHpMp->GetCheckedState_MAYBE();
+    if (data->IsVIGOR())
+        return !DontPickVigor->GetCheckedState_MAYBE();
+
+    return true;
+}
+
+bool CIFMacroMenuPickFilter::IsPickupCandidate(CIItem* item, int itemUniqueId,
+                                               const SItemData* data,
+                                               bool hasEmptySlot,
+                                               const std::set<int>& mergeableItems)
+{
+    if (!g_pMyPlayerObj || !g_CGlobalDataManager || !item || itemUniqueId == 0 || data == NULL)
+        return false;
+
+    if (item->m_bPickAbbilty)
+        return false;
+
+    const bool isGold =
+        data->m_typeId.getTypeID1() == 3 &&
+        data->m_typeId.getTypeID2() == 3 &&
+        data->m_typeId.getTypeID3() == 5 &&
+        data->m_typeId.getTypeID4() == 0;
+    if (!isGold && !hasEmptySlot &&
+        (data->m_maxStack <= 1 || mergeableItems.find(data->RefObjectId) == mergeableItems.end()))
+        return false;
+
+    if (item->hasOwner)
+    {
+        int myOwnerName = *(int*)((DWORD32)g_pMyPlayerObj + 0x2094);
+        if (item->SomeCheckForPlayerOwnerName != myOwnerName)
+            return false;
+    }
+
+    D3DVECTOR myLocation = g_pMyPlayerObj->GetLocation();
+    D3DVECTOR itemLocation = item->GetLocation();
+    GetSilkPos(g_pMyPlayerObj->GetRegion(), myLocation);
+    GetSilkPos(item->GetRegion(), itemLocation);
+    if (MacroPickDistance(myLocation, itemLocation) > 800.0f)
+        return false;
+
+    unsigned long now = GetTickCount();
+    if (m_lastPickupRequestTime.size() > 512)
+    {
+        for (std::map<int, unsigned long>::iterator old = m_lastPickupRequestTime.begin();
+             old != m_lastPickupRequestTime.end();)
+        {
+            if (now - old->second > 10000)
+                m_lastPickupRequestTime.erase(old++);
+            else
+                ++old;
+        }
+    }
+    std::map<int, unsigned long>::iterator throttleIt = m_lastPickupRequestTime.find(itemUniqueId);
+    if (throttleIt != m_lastPickupRequestTime.end() && now - throttleIt->second < 750)
+        return false;
+
+    m_lastPickupRequestTime[itemUniqueId] = now;
+    return true;
+}
+
+void CIFMacroMenuPickFilter::SendPickupRequest(bool viaPet, int petUniqueId, int itemUniqueId)
+{
+    if (itemUniqueId == 0)
+        return;
+
+    if (viaPet)
+    {
+        if (petUniqueId == 0)
+            return;
+
+        CMsgStreamBuffer buf(0x70C5);
+        buf << petUniqueId;
+        buf << (byte)8;
+        buf << itemUniqueId;
+        SendMsg(buf);
+    }
+    else
+    {
+        CMsgStreamBuffer buf(0x7074);
+        buf << (byte)1;
+        buf << (byte)2;
+        buf << (byte)1;
+        buf << itemUniqueId;
+        SendMsg(buf);
+    }
+}
+
+void CIFMacroMenuPickFilter::PickWithPet()
+{
+    if (!Macro_PetFilter)
+    {
+        if (PetPickTimerIsRunning && g_pCGInterface)
+            g_pCGInterface->KillTimer(START_PICK_PET_TIMER);
+        PetPickTimerIsRunning = false;
+        return;
+    }
+
+    if (!g_pMyPlayerObj || !g_pCGInterface || !g_pGfxEttManager || !IsRuntimeReady())
+        return;
+
+    if(!PetPickTimerIsRunning)
+    {
+        PetPickTimerIsRunning = true;
+        g_pCGInterface->StartTimer(START_PICK_PET_TIMER, 500);
+    }
+
+    bool viaPet = PickViaPetCheckBox && PickViaPetCheckBox->GetCheckedState_MAYBE();
+    bool viaCharacter = PickViaCharCheckBox && PickViaCharCheckBox->GetCheckedState_MAYBE();
+    if (!viaPet && !viaCharacter)
+    {
+        viaCharacter = true;
+        PickViaCharCheckBox->SetCheckBoxState(true);
+    }
+
+    int pickupPetId = 0;
+    if (viaPet && g_pMyPlayerObj->CCOSDataMgr)
+    {
+        for(std::map<int, CCOSDataMgr::CosData*>::iterator petIt =
+                g_pMyPlayerObj->CCOSDataMgr->CosList.begin();
+            petIt != g_pMyPlayerObj->CCOSDataMgr->CosList.end(); ++petIt)
+        {
+            CICharactor* pet = GetCharacterObjectByID_MAYBE(petIt->first);
+            if (!pet || pet->CHARACTER_STATUS == Dead || !pet->GetCommonData())
+                continue;
+
+            const CCharacterData* characterData =
+                g_CGlobalDataManager->GetCharacter(pet->GetCommonData()->RefObjectId);
+            if (characterData && characterData->IsGrapPet())
+            {
+                pickupPetId = petIt->first;
+                break;
+            }
+        }
+        if (pickupPetId == 0)
+            return;
+    }
+
+    if (!viaPet &&
+        (g_pMyPlayerObj->CHARACTER_STATUS == Dead ||
+         g_pMyPlayerObj->CHARACTER_STATUS == Stall ||
+         g_pMyPlayerObj->CHARACTER_STATUS == SkillCast ||
+         g_pMyPlayerObj->Dead0Stay1Walking2Sit0SkillCast0emotion33Stall12817isridingpet == 17))
+        return;
+
+    const bool hasEmptySlot = g_CGlobalDataManager->GetEmptyInventorySlots() != 0;
+    std::set<int> mergeableItems;
+    if (!hasEmptySlot && g_pCGInterface->GetMainPopup() &&
+        g_pCGInterface->GetMainPopup()->GetInventory())
+    {
+        CIFInventory* inventory = g_pCGInterface->GetMainPopup()->GetInventory();
+        for (std::n_vector<CIFSlotWithHelp*>::iterator slotIt = inventory->pSlots.begin();
+             slotIt != inventory->pSlots.end(); ++slotIt)
+        {
+            CIFSlotWithHelp* slot = *slotIt;
+            if (!slot || !slot->ItemInfo || !slot->ItemInfo->GetItemData())
+                continue;
+            const SItemData* slotData = slot->ItemInfo->GetItemData();
+            if (slotData->m_maxStack > 1 && slot->ItemInfo->GetQuantity() < slotData->m_maxStack)
+                mergeableItems.insert(slotData->RefObjectId);
+        }
+    }
+
+    for (std::map<int, CIObject*>::iterator objectIt = g_pGfxEttManager->entities.begin();
+         objectIt != g_pGfxEttManager->entities.end(); ++objectIt)
+    {
+        CIObject* object = objectIt->second;
+        if (!object || !object->IsSame(GFX_RUNTIME_CLASS(CIItem)))
+            continue;
+
+        CIItem* item = (CIItem*)object;
+        const SCommonData* commonData = item->GetCommonData();
+        if (!commonData || commonData->RefObjectId <= 0)
+            continue;
+
+        const int itemUniqueId = item->GetUniqueId();
+        const SItemData* itemData =
+            &g_CGlobalDataManager->GetItemData(commonData->RefObjectId);
+        if (!ShouldPickItem(itemData) ||
+            !IsPickupCandidate(item, itemUniqueId, itemData, hasEmptySlot, mergeableItems))
+            continue;
+
+        SendPickupRequest(viaPet, pickupPetId, itemUniqueId);
+        return; // Global rate limit: at most one pickup request per timer tick.
+    }
+    return;
+}
+>>>>>>> theirs

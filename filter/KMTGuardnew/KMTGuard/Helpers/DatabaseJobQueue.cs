@@ -2,6 +2,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Data.SqlClient;
 using Serilog;
+using KMTGuard.Database;
 
 namespace KMTGuard.Helpers;
 
@@ -13,7 +14,8 @@ public static class DatabaseJobQueue
     private sealed record DatabaseJob(
         Func<CancellationToken, Task> Action,
         TaskCompletionSource? Completion,
-        string Operation);
+        string Operation,
+        long EnqueuedAt);
 
     private sealed class WorkerGeneration
     {
@@ -35,6 +37,25 @@ public static class DatabaseJobQueue
     private static WorkerGeneration _generation = StartGeneration();
     private static Task _stopCompletion = Task.CompletedTask;
     private static int _stopped;
+    private static int _queueDepth;
+    private static long _droppedJobs;
+    private static long _completedJobs;
+    private static long _lastQueueAgeMs;
+    private static long _lastExecutionMs;
+
+    public readonly record struct QueueHealth(
+        int Depth,
+        long DroppedJobs,
+        long CompletedJobs,
+        long LastQueueAgeMs,
+        long LastExecutionMs);
+
+    public static QueueHealth GetHealth() => new(
+        Volatile.Read(ref _queueDepth),
+        Interlocked.Read(ref _droppedJobs),
+        Interlocked.Read(ref _completedJobs),
+        Interlocked.Read(ref _lastQueueAgeMs),
+        Interlocked.Read(ref _lastExecutionMs));
 
     private static Channel<DatabaseJob> CreateQueue() =>
         Channel.CreateBounded<DatabaseJob>(new BoundedChannelOptions(Capacity)
@@ -93,11 +114,31 @@ public static class DatabaseJobQueue
 
         var completion = new TaskCompletionSource(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var job = new DatabaseJob(action, completion, operation);
+        var job = new DatabaseJob(action, completion, operation, Environment.TickCount64);
 
         var generation = Volatile.Read(ref _generation);
-        await generation.Queue.Writer.WriteAsync(job, cancellationToken);
-        await completion.Task.WaitAsync(cancellationToken);
+        Interlocked.Increment(ref _queueDepth);
+        try
+        {
+            await generation.Queue.Writer.WriteAsync(job, cancellationToken);
+        }
+        catch
+        {
+            Interlocked.Decrement(ref _queueDepth);
+            throw;
+        }
+        try
+        {
+            await completion.Task.WaitAsync(SqlExecutionPolicy.PacketCriticalTimeout, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            Log.Warning(
+                "Packet-critical database wait exceeded {TimeoutSeconds}s: {Operation}; forwarding will continue.",
+                SqlExecutionPolicy.PacketCriticalSeconds,
+                operation);
+            throw;
+        }
     }
 
     public static bool TryQueueBackground(
@@ -114,10 +155,15 @@ public static class DatabaseJobQueue
             return false;
         }
 
-        var job = new DatabaseJob(action, null, operation);
+        var job = new DatabaseJob(action, null, operation, Environment.TickCount64);
         var generation = Volatile.Read(ref _generation);
         if (generation.Queue.Writer.TryWrite(job))
+        {
+            Interlocked.Increment(ref _queueDepth);
             return true;
+        }
+
+        Interlocked.Increment(ref _droppedJobs);
 
         Log.Warning(
             "Database job queue is full; background job was dropped to protect packet processing: {Operation}",
@@ -238,10 +284,16 @@ public static class DatabaseJobQueue
             await foreach (var job in generation.Queue.Reader.ReadAllAsync(
                                generation.Shutdown.Token))
             {
+                Interlocked.Decrement(ref _queueDepth);
+                Interlocked.Exchange(
+                    ref _lastQueueAgeMs,
+                    Math.Max(0, Environment.TickCount64 - job.EnqueuedAt));
+                long executionStarted = Environment.TickCount64;
                 try
                 {
                     await job.Action(generation.Shutdown.Token);
                     job.Completion?.TrySetResult();
+                    Interlocked.Increment(ref _completedJobs);
                 }
                 catch (OperationCanceledException)
                     when (generation.Shutdown.IsCancellationRequested)
@@ -266,12 +318,21 @@ public static class DatabaseJobQueue
 
                     job.Completion?.TrySetException(ex);
                 }
+                finally
+                {
+                    Interlocked.Exchange(
+                        ref _lastExecutionMs,
+                        Math.Max(0, Environment.TickCount64 - executionStarted));
+                }
             }
         }
         catch (OperationCanceledException) when (generation.Shutdown.IsCancellationRequested)
         {
             while (generation.Queue.Reader.TryRead(out var job))
+            {
+                Interlocked.Decrement(ref _queueDepth);
                 job.Completion?.TrySetCanceled(generation.Shutdown.Token);
+            }
         }
     }
 

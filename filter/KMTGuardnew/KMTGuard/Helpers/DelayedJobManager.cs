@@ -32,7 +32,9 @@ namespace KMTGuard.Helpers
             }
         }
 
-        public void Stop()
+        public void Stop() => StopAsync().GetAwaiter().GetResult();
+
+        public async Task StopAsync()
         {
             Task? worker;
             CancellationTokenSource? shutdown;
@@ -49,7 +51,12 @@ namespace KMTGuard.Helpers
 
             try { shutdown.Cancel(); } catch { }
             SignalWorker();
-            try { worker?.Wait(TimeSpan.FromSeconds(2)); } catch { }
+            try
+            {
+                if (worker != null)
+                    await worker;
+            }
+            catch (OperationCanceledException) when (shutdown.IsCancellationRequested) { }
             shutdown.Dispose();
         }
 

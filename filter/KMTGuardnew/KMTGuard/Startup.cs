@@ -4,6 +4,7 @@ using KMTGuard.Helpers;
 using KMTGuard.Localization;
 using KMTGuard.Runtime;
 using KMTGuard.RuntimeContract;
+using KMTGuard.Server;
 using KMTGuard.ServerManagers;
 using KMTGuard.SettingManager;
 
@@ -94,7 +95,7 @@ public static class Program
             }
             catch
             {
-                CleanupRuntime();
+                await CleanupRuntimeAsync();
                 throw;
             }
         }
@@ -112,7 +113,7 @@ public static class Program
             if (!_isRunning && InstanceMutexes.Count == 0)
                 return;
 
-            CleanupRuntime();
+            await CleanupRuntimeAsync();
         }
         finally
         {
@@ -163,13 +164,13 @@ public static class Program
         return StopEmbeddedAsync();
     }
 
-    private static void CleanupRuntime()
+    private static async Task CleanupRuntimeAsync()
     {
         if (_runtimeControlServer != null)
         {
             try
             {
-                _runtimeControlServer.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                await _runtimeControlServer.DisposeAsync();
             }
             catch (Exception ex)
             {
@@ -181,7 +182,7 @@ public static class Program
 
         try
         {
-            ServerManager.Dispose();
+            await ServerManager.DisposeAsync();
         }
         catch (Exception ex)
         {
@@ -202,6 +203,7 @@ public static class Program
         }
 
         InstanceMutexes.Clear();
+        QuickLoginAgentAuthBridge.Stop();
         if (QuickLoginMasterKey.Length > 0)
             CryptographicOperations.ZeroMemory(QuickLoginMasterKey);
         QuickLoginMasterKey = Array.Empty<byte>();
@@ -258,10 +260,11 @@ public static class Program
         Connectionstring = connectionBuilder.ConnectionString;
         sqlPassword = string.Empty;
 
-        if (role is FilterRole.Gateway or FilterRole.All)
+        if (role is FilterRole.Gateway or FilterRole.Agent or FilterRole.All)
             QuickLoginMasterKey = settings.GetOrCreateQuickLoginMasterKey();
         else
             QuickLoginMasterKey = Array.Empty<byte>();
+        QuickLoginAgentAuthBridge.Start();
 
         MainMachineIP = settings.Settings.ServerIP;
         DatabaseJobQueue.Start();
