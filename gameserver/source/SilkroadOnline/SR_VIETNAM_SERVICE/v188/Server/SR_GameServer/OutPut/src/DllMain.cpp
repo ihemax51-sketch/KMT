@@ -10,12 +10,22 @@
 
 typedef int (WINAPI* fnMessageBoxA)(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);
 typedef int (WINAPI* fnMessageBoxW)(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType);
+typedef BOOL (WINAPI* fnGetModuleHandleExACompat)(DWORD dwFlags, LPCSTR lpModuleName, HMODULE* phModule);
 fnMessageBoxA pfnOrigMessageBoxA = NULL;
 fnMessageBoxW pfnOrigMessageBoxW = NULL;
+
+#ifndef GET_MODULE_HANDLE_EX_FLAG_PIN
+#define GET_MODULE_HANDLE_EX_FLAG_PIN 0x00000001
+#endif
+
+#ifndef GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
+#define GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS 0x00000004
+#endif
 
 namespace
 {
     __declspec(thread) bool s_insideMessageBoxHook = false;
+    HMODULE s_processLifetimeModule = NULL;
 
     bool IsIgnorablePackagePriceMessage(const char* text)
     {
@@ -142,6 +152,19 @@ static void RemoveSystemMessageHooks()
 static DWORD InitializeGameServerAddonCore(HMODULE hModule)
 {
         GameServerConsole::Initialize();
+        HMODULE hKernel32 = GetModuleHandleA("Kernel32.dll");
+        fnGetModuleHandleExACompat getModuleHandleExA = hKernel32 == NULL
+            ? NULL
+            : reinterpret_cast<fnGetModuleHandleExACompat>(
+                GetProcAddress(hKernel32, "GetModuleHandleExA"));
+        if (getModuleHandleExA == NULL || !getModuleHandleExA(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                reinterpret_cast<LPCSTR>(&InitializeGameServerAddonCore),
+                &s_processLifetimeModule))
+        {
+            GameServerConsole::WriteFailure("GameServer add-on process-lifetime pin failed");
+            return ERROR_DLL_INIT_FAILED;
+        }
         GameServerCrashHandler::Initialize(hModule);
 
         if (!GameServerRuntimeSafety::ValidateHost())

@@ -253,6 +253,9 @@ function Build-GameServer {
         "exit /b %errorlevel%"
     ) "build-gameserver"
     Assert-Output (Join-Path $destination "KMTGuard_GameServer.dll")
+    $ini = Join-Path $PSScriptRoot "templates\KMTGuard-Addon.ini"
+    Assert-Output $ini
+    Copy-Item -LiteralPath $ini -Destination $destination -Force
     Copy-Item -LiteralPath $versionPath -Destination $destination -Force
 }
 

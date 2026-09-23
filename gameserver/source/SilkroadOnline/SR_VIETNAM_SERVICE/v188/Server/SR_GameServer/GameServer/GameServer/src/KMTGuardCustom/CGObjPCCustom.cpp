@@ -14,6 +14,7 @@
 #include <KMTGuardCustom/GameServerTelemetry.h>
 #include <KMTGuardCustom/InternalPacketAuth.h>
 #include <KMTGuardCustom/ItemRegionTravelGuard.h>
+#include <KMTGuardCustom/UniqueSpawnGuard.h>
 
 
 SPosInfo CGObjPC::GetCurrentPosition()
@@ -435,6 +436,8 @@ namespace {
 
 void CGObjPC::OnDeleteObjectCustom()
 {
+    GameServerTelemetry::ForgetSession(this->GetGameID());
+    UniqueSpawnGuard::ForgetPlayer(this);
     RemoveFilterSessionKey(this);
     CItemRegionTravelGuard::ForgetPlayer(this);
     CRegionAttackRestrictionsMgr::ForgetPlayer(this);
@@ -451,7 +454,9 @@ void CGObjPC::ReaderPacket(CMsg* pMsg) {
         pMsg->m_wReadDataArrayPos > pMsg->m_wWriteDataArrayPos ||
         pMsg->m_wWriteDataArrayPos > pMsg->m_dwArrayDataSize)
     {
-        GameServerTelemetry::RecordMalformedPacket();
+        GameServerTelemetry::RecordMalformedPacketForSession(
+            this != NULL ? this->GetGameID() : 0,
+            pMsg != NULL && pMsg->m_wpMsgId != NULL ? *pMsg->m_wpMsgId : 0);
         return;
     }
 
@@ -467,7 +472,7 @@ void CGObjPC::ReaderPacket(CMsg* pMsg) {
         const DWORD registrationSize = 1 + 4 + 8 + 16 + 32 + 32;
         if (pMsg->m_wWriteDataArrayPos - pMsg->m_wReadDataArrayPos != registrationSize)
         {
-            GameServerTelemetry::RecordMalformedPacket();
+            GameServerTelemetry::RecordMalformedPacketForSession(this->GetGameID(), *pMsg->m_wpMsgId);
             return;
         }
         BYTE version = 0;
@@ -625,6 +630,11 @@ void CGObjPC::ReaderPacket(CMsg* pMsg) {
             this->GetPosInfo(minePos);
             SWorldID mineWorldID;
             this->GetWorldID(mineWorldID);
+
+            if (!UniqueSpawnGuard::AuthorizeAndConsume(
+                    this, uniquetype, mineWorldID, minePos,
+                    reinterpret_cast<const BYTE*>(Key.data()), Key.size()))
+                return;
 
             if (uniquetype == 0) {
                 CGObjMob::CreateMob(46406, mineWorldID.dwWorldID, (uint16_t) minePos.wRegionID, (float) minePos.fltX,

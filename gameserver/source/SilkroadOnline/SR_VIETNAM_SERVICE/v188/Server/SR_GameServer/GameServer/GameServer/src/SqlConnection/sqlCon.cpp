@@ -26,25 +26,27 @@ namespace
     HANDLE s_securityRefreshStopEvent = NULL;
     HANDLE s_securityRefreshThread = NULL;
     SQLHANDLE s_activeSqlStatement = SQL_NULL_HSTMT;
+    SQLHANDLE s_activeRefreshStatement = SQL_NULL_HSTMT;
     volatile LONG s_securityRefreshState = 0;
     const DWORD SECURITY_REFRESH_SHUTDOWN_TIMEOUT_MS = 35000;
 
     class ScopedSqlConnectionLock
     {
     public:
-        explicit ScopedSqlConnectionLock(CAutoCriticalSection& lock)
-            : m_lock(lock)
+        explicit ScopedSqlConnectionLock(CAutoCriticalSection& lock, bool acquire = true)
+            : m_lock(lock), m_acquired(acquire)
         {
-            m_lock.Enter();
+            if (m_acquired) m_lock.Enter();
         }
 
         ~ScopedSqlConnectionLock()
         {
-            m_lock.Leave();
+            if (m_acquired) m_lock.Leave();
         }
 
     private:
         CAutoCriticalSection& m_lock;
+        bool m_acquired;
         ScopedSqlConnectionLock(const ScopedSqlConnectionLock&);
         ScopedSqlConnectionLock& operator=(const ScopedSqlConnectionLock&);
     };
@@ -72,8 +74,8 @@ namespace
     class ScopedSqlStatement
     {
     public:
-        explicit ScopedSqlStatement(CDbConnection* connection)
-            : m_connection(connection), m_handle(SQL_NULL_HSTMT)
+        explicit ScopedSqlStatement(CDbConnection* connection, bool refreshStatement = false)
+            : m_connection(connection), m_handle(SQL_NULL_HSTMT), m_refreshStatement(refreshStatement)
         {
         }
 
@@ -91,7 +93,7 @@ namespace
             if (m_connection == NULL || !m_connection->AllocStmt(m_handle))
                 return false;
             EnterCriticalSection(&s_activeSqlStatementLock);
-            s_activeSqlStatement = m_handle;
+            (m_refreshStatement ? s_activeRefreshStatement : s_activeSqlStatement) = m_handle;
             LeaveCriticalSection(&s_activeSqlStatementLock);
             return true;
         }
@@ -104,14 +106,15 @@ namespace
         void ClearActive()
         {
             EnterCriticalSection(&s_activeSqlStatementLock);
-            if (s_activeSqlStatement == m_handle)
-                s_activeSqlStatement = SQL_NULL_HSTMT;
+            SQLHANDLE& active = m_refreshStatement ? s_activeRefreshStatement : s_activeSqlStatement;
+            if (active == m_handle) active = SQL_NULL_HSTMT;
             LeaveCriticalSection(&s_activeSqlStatementLock);
         }
 
     private:
         CDbConnection* m_connection;
         SQLHANDLE m_handle;
+        bool m_refreshStatement;
         ScopedSqlStatement(const ScopedSqlStatement&);
         ScopedSqlStatement& operator=(const ScopedSqlStatement&);
     };
@@ -144,21 +147,29 @@ namespace
 
     DWORD WINAPI SecuritySnapshotRefreshWorker(LPVOID)
     {
+        CDbConnection refreshConnection(CNewSettings::m_Settings->DatabaseConnectionString);
+        if (!refreshConnection.Connect())
+        {
+            GameServerTelemetry::RecordSecuritySnapshotRefresh(false);
+            InterlockedExchange(&s_securityRefreshState, 0);
+            return 0;
+        }
         for (;;)
         {
             const DWORD waitResult = WaitForSingleObject(s_securityRefreshStopEvent, 60000);
             if (waitResult != WAIT_TIMEOUT)
                 break;
 
-            const bool lockedItemsLoaded = CSqlCon::LoadLockedItems();
+            const bool lockedItemsLoaded = CSqlCon::LoadLockedItems(&refreshConnection, true);
             if (WaitForSingleObject(s_securityRefreshStopEvent, 0) == WAIT_OBJECT_0)
                 break;
-            const bool fortressDpsLoaded = CSqlCon::LoadFortressDPSInfo();
+            const bool fortressDpsLoaded = CSqlCon::LoadFortressDPSInfo(&refreshConnection, true);
             GameServerTelemetry::RecordSecuritySnapshotRefresh(
                 lockedItemsLoaded && fortressDpsLoaded);
             if (!lockedItemsLoaded || !fortressDpsLoaded)
                 BS_INFO("[KMTGuard][Security] Snapshot refresh failed; retaining the last valid snapshot");
         }
+        refreshConnection.Disconnect();
         InterlockedExchange(&s_securityRefreshState, 0);
         return 0;
     }
@@ -169,6 +180,9 @@ namespace
         const SQLHANDLE statement = s_activeSqlStatement;
         if (statement != SQL_NULL_HSTMT)
             SQLCancel(static_cast<SQLHSTMT>(statement));
+        const SQLHANDLE refreshStatement = s_activeRefreshStatement;
+        if (refreshStatement != SQL_NULL_HSTMT)
+            SQLCancel(static_cast<SQLHSTMT>(refreshStatement));
         LeaveCriticalSection(&s_activeSqlStatementLock);
     }
 
@@ -545,16 +559,16 @@ void CSqlCon::RemoveLockedItem(INT64 itemId)
     GameServerTelemetry::SetLockedItemCacheSize(cacheSize);
 }
 
-bool CSqlCon::LoadLockedItems()
+bool CSqlCon::LoadLockedItems(CDbConnection* connection, bool workerStatement)
 {
-    ScopedSqlConnectionLock databaseGuard(s_sqlConnectionLock);
-    SQLHANDLE hStmt = SQL_NULL_HSTMT;
-    CDbConnection* m_pDbConnection = m_connectionstr;
+    ScopedSqlConnectionLock databaseGuard(s_sqlConnectionLock, connection == NULL);
+    CDbConnection* m_pDbConnection = connection != NULL ? connection : m_connectionstr;
 
     if (m_pDbConnection == NULL)
         return false;
 
-    if (!m_pDbConnection->AllocStmt(hStmt))
+    ScopedSqlStatement statement(m_pDbConnection, workerStatement);
+    if (!statement.Allocate())
     {
         BS_INFO("[KMTGuard][Database] Locked-item statement allocation failed");
         return false;
@@ -564,15 +578,14 @@ bool CSqlCon::LoadLockedItems()
     const LPCSTR szQuery = "SELECT ItemID64 FROM [dbo].[Item_Locked]";
     std::vector<INT64> loadedItems;
 
-    retCode = SQLExecDirectA(hStmt, (SQLCHAR*)szQuery, SQL_NTS);
+    retCode = SQLExecDirectA(statement.Get(), (SQLCHAR*)szQuery, SQL_NTS);
     if (!SQL_SUCCEEDED(retCode))
     {
         BS_INFO("[KMTGuard][Database] Locked-item cache query failed");
-        m_pDbConnection->FreeStmt(hStmt);
         return false;
     }
 
-    retCode = SQLFetch(hStmt);
+    retCode = SQLFetch(statement.Get());
 
     if (retCode == SQL_NO_DATA)
     {
@@ -581,14 +594,12 @@ bool CSqlCon::LoadLockedItems()
             LockedItemList.clear();
         }
         GameServerTelemetry::SetLockedItemCacheSize(0);
-        m_pDbConnection->FreeStmt(hStmt);
         return true;
     }
 
     if (!SQL_SUCCEEDED(retCode))
     {
         BS_INFO("[KMTGuard][Database] Locked-item cache fetch failed");
-        m_pDbConnection->FreeStmt(hStmt);
         return false;
     }
 
@@ -597,22 +608,20 @@ bool CSqlCon::LoadLockedItems()
         INT64 itemId = 0;
         SQLLEN itemLength = 0;
         const SQLRETURN itemResult = SQLGetData(
-            hStmt, 1, SQL_C_SBIGINT, &itemId, sizeof(itemId), &itemLength);
+            statement.Get(), 1, SQL_C_SBIGINT, &itemId, sizeof(itemId), &itemLength);
         if (!SQL_SUCCEEDED(itemResult) || itemLength == SQL_NULL_DATA || itemId <= 0)
         {
             BS_INFO("[KMTGuard][Database] Locked-item row is invalid");
-            m_pDbConnection->FreeStmt(hStmt);
             return false;
         }
         loadedItems.push_back(itemId);
 
-        retCode = SQLFetch(hStmt);
+        retCode = SQLFetch(statement.Get());
     } while (SQL_SUCCEEDED(retCode));
 
     if (retCode != SQL_NO_DATA)
     {
         BS_INFO("[KMTGuard][Database] Locked-item cache ended with a fetch error");
-        m_pDbConnection->FreeStmt(hStmt);
         return false;
     }
 
@@ -629,7 +638,6 @@ bool CSqlCon::LoadLockedItems()
     }
     GameServerTelemetry::SetLockedItemCacheSize(cacheSize);
 
-    m_pDbConnection->FreeStmt(hStmt);
     return true;
 }
 
@@ -1556,14 +1564,15 @@ CRegionRestrictionDBSet* CSqlCon::GetRegionRestrictionDbSet()
 {
     return s_pRegionRestrictionDbSet;
 }
-bool CSqlCon::LoadFortressDPSInfo()
+bool CSqlCon::LoadFortressDPSInfo(CDbConnection* connection, bool workerStatement)
 {
-    if (m_connectionstr == NULL)
+    CDbConnection* database = connection != NULL ? connection : m_connectionstr;
+    if (database == NULL)
         return false;
 
     std::map<int, _ServerFortressDpsInfo> staged;
-    ScopedSqlConnectionLock sqlGuard(s_sqlConnectionLock);
-    ScopedSqlStatement statement(m_connectionstr);
+    ScopedSqlConnectionLock sqlGuard(s_sqlConnectionLock, connection == NULL);
+    ScopedSqlStatement statement(database, workerStatement);
     if (!statement.Allocate())
         return false;
 

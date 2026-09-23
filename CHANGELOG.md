@@ -4,6 +4,14 @@
 
 Release date: 2026-09-21
 
+### GameServer stability hardening - 2026-09-23 (developer build)
+
+- Added server-authorized unique event spawning with location restrictions, replay protection, per-character pacing, and a global event budget.
+- Time-sliced live damage ranking updates so large events remain responsive under load.
+- Isolated telemetry storage and security snapshot database refreshes from live gameplay processing, and hardened authentication and add-on lifetime handling.
+- Added bounded malformed-packet offender diagnostics without changing the existing Filter enforcement model.
+- Requirement: configure authorized event character IDs and allowed event worlds/regions, replace the GameServer add-on, and restart GameServer after successful Windows staging. No SQL update, Filter restart, client replacement, ShardManager replacement, or media update is required.
+
 ### Client DLL build correction - 2026-09-23 (developer build)
 
 - Corrected the Client DLL automation source so the pickup and character-entry systems compile together without changing their intended behavior.

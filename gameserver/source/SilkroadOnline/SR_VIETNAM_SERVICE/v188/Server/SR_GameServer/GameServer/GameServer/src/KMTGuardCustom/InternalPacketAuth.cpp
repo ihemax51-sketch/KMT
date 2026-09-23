@@ -194,7 +194,10 @@ InternalPacketAuth::ValidationResult InternalPacketAuth::ValidateRegistration(
     DWORD expectedGameId, BYTE version, DWORD gameId, __int64 issuedAtUnixSeconds,
     const BYTE nonce[16], const BYTE sessionKey[32], const BYTE mac[32])
 {
-    if (!s_initialized) return AUTH_NOT_INITIALIZED;
+    EnterCriticalSection(&s_authLock);
+    const bool initialized = s_initialized;
+    LeaveCriticalSection(&s_authLock);
+    if (!initialized) return AUTH_NOT_INITIALIZED;
     if (version != 2) return AUTH_BAD_VERSION;
     if (gameId == 0 || gameId != expectedGameId) return AUTH_GAME_ID_MISMATCH;
 

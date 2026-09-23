@@ -6,9 +6,13 @@
 namespace GameServerTelemetry
 {
     void Initialize();
+    void Shutdown();
     void RecordMalformedPacket();
     void RecordPacketAuthFailure(int reason);
     void RecordRuntimeError();
+    void RecordUniqueSpawnRejected(int reason);
+    void RecordMalformedPacketForSession(DWORD sessionId, WORD opcode);
+    void ForgetSession(DWORD sessionId);
     void RecordLiveDpsBatch(unsigned int packetCount);
     void RecordFortressDpsSnapshot();
     void SetFreeForAllState(bool enabled);
