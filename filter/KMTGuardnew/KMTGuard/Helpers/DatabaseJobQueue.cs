@@ -11,11 +11,61 @@ public static class DatabaseJobQueue
     private const int Capacity = 512;
     private const int WorkerCount = 2;
 
-    private sealed record DatabaseJob(
-        Func<CancellationToken, Task> Action,
-        TaskCompletionSource? Completion,
-        string Operation,
-        long EnqueuedAt);
+    private enum DatabaseJobState
+    {
+        Queued,
+        Running,
+        Completed,
+        Failed,
+        CancelledBeforeStart
+    }
+
+    private sealed class DatabaseJob
+    {
+        private int _state = (int)DatabaseJobState.Queued;
+
+        public DatabaseJob(
+            Func<CancellationToken, Task> action,
+            TaskCompletionSource? completion,
+            string operation,
+            long enqueuedAt)
+        {
+            Action = action;
+            Completion = completion;
+            Operation = operation;
+            EnqueuedAt = enqueuedAt;
+        }
+
+        public Func<CancellationToken, Task> Action { get; }
+        public TaskCompletionSource? Completion { get; }
+        public string Operation { get; }
+        public long EnqueuedAt { get; }
+        public DatabaseJobState State => (DatabaseJobState)Volatile.Read(ref _state);
+
+        public bool TryStart() =>
+            Interlocked.CompareExchange(
+                ref _state,
+                (int)DatabaseJobState.Running,
+                (int)DatabaseJobState.Queued) == (int)DatabaseJobState.Queued;
+
+        public bool TryCancelBeforeStart() =>
+            Interlocked.CompareExchange(
+                ref _state,
+                (int)DatabaseJobState.CancelledBeforeStart,
+                (int)DatabaseJobState.Queued) == (int)DatabaseJobState.Queued;
+
+        public void MarkCompleted() =>
+            Interlocked.CompareExchange(
+                ref _state,
+                (int)DatabaseJobState.Completed,
+                (int)DatabaseJobState.Running);
+
+        public void MarkFailed() =>
+            Interlocked.CompareExchange(
+                ref _state,
+                (int)DatabaseJobState.Failed,
+                (int)DatabaseJobState.Running);
+    }
 
     private sealed class WorkerGeneration
     {
@@ -107,6 +157,22 @@ public static class DatabaseJobQueue
         [CallerMemberName] string operation = "database job",
         CancellationToken cancellationToken = default)
     {
+        await RunCoreAsync(action, SqlExecutionPolicy.PacketCriticalTimeout, operation, cancellationToken);
+    }
+
+    internal static Task RunAsyncForTesting(
+        Func<CancellationToken, Task> action,
+        TimeSpan waitTimeout,
+        string operation,
+        CancellationToken cancellationToken = default) =>
+        RunCoreAsync(action, waitTimeout, operation, cancellationToken);
+
+    private static async Task RunCoreAsync(
+        Func<CancellationToken, Task> action,
+        TimeSpan waitTimeout,
+        string operation,
+        CancellationToken cancellationToken)
+    {
         ArgumentNullException.ThrowIfNull(action);
 
         if (Volatile.Read(ref _stopped) != 0)
@@ -127,17 +193,45 @@ public static class DatabaseJobQueue
             Interlocked.Decrement(ref _queueDepth);
             throw;
         }
+        await WaitForDefinitiveOutcomeAsync(job, completion, waitTimeout, cancellationToken);
+    }
+
+    private static async Task WaitForDefinitiveOutcomeAsync(
+        DatabaseJob job,
+        TaskCompletionSource completion,
+        TimeSpan waitTimeout,
+        CancellationToken cancellationToken)
+    {
+        using var waitLifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        waitLifetime.CancelAfter(waitTimeout);
         try
         {
-            await completion.Task.WaitAsync(SqlExecutionPolicy.PacketCriticalTimeout, cancellationToken);
+            await completion.Task.WaitAsync(waitLifetime.Token);
+            return;
         }
-        catch (TimeoutException)
+        catch (OperationCanceledException) when (
+            waitLifetime.IsCancellationRequested && !completion.Task.IsCompleted)
         {
+            if (job.TryCancelBeforeStart())
+            {
+                completion.TrySetCanceled(waitLifetime.Token);
+                Log.Warning(
+                    "Database job was cancelled before execution after waiting {TimeoutSeconds}s: {Operation}",
+                    SqlExecutionPolicy.PacketCriticalSeconds,
+                    job.Operation);
+                throw new TimeoutException(
+                    $"Database job '{job.Operation}' did not start before its wait deadline.");
+            }
+
+            // Once a non-idempotent action has started, abandoning only its waiter
+            // would give the packet path a false cancellation result while the
+            // mutation could still commit.  Await the owned worker to a definitive
+            // completed/failed result instead.
             Log.Warning(
-                "Packet-critical database wait exceeded {TimeoutSeconds}s: {Operation}; forwarding will continue.",
+                "Database job exceeded its initial {TimeoutSeconds}s wait after starting; awaiting its definitive result: {Operation}",
                 SqlExecutionPolicy.PacketCriticalSeconds,
-                operation);
-            throw;
+                job.Operation);
+            await completion.Task;
         }
     }
 
@@ -285,6 +379,13 @@ public static class DatabaseJobQueue
                                generation.Shutdown.Token))
             {
                 Interlocked.Decrement(ref _queueDepth);
+                if (!job.TryStart())
+                {
+                    if (job.State == DatabaseJobState.CancelledBeforeStart)
+                        job.Completion?.TrySetCanceled();
+                    continue;
+                }
+
                 Interlocked.Exchange(
                     ref _lastQueueAgeMs,
                     Math.Max(0, Environment.TickCount64 - job.EnqueuedAt));
@@ -292,12 +393,14 @@ public static class DatabaseJobQueue
                 try
                 {
                     await job.Action(generation.Shutdown.Token);
+                    job.MarkCompleted();
                     job.Completion?.TrySetResult();
                     Interlocked.Increment(ref _completedJobs);
                 }
                 catch (OperationCanceledException)
                     when (generation.Shutdown.IsCancellationRequested)
                 {
+                    job.MarkFailed();
                     job.Completion?.TrySetCanceled(generation.Shutdown.Token);
                 }
                 catch (Exception ex)
@@ -320,6 +423,7 @@ public static class DatabaseJobQueue
                 }
                 finally
                 {
+                    job.MarkFailed();
                     Interlocked.Exchange(
                         ref _lastExecutionMs,
                         Math.Max(0, Environment.TickCount64 - executionStarted));

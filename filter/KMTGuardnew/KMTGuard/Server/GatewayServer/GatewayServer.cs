@@ -274,6 +274,7 @@ namespace KMTGuard.Server
                     ((ISession)state).Stop("gateway redirect completed");
                     return Task.CompletedTask;
                 }));
+            session.SessionData.GatewayCredential.Clear();
             return new PacketResult(redirectPacket, PacketResultType.Override);
         }
 
@@ -282,6 +283,7 @@ namespace KMTGuard.Server
             session.PendingQuickLogin = false;
             session.PendingPrimaryLogin = false;
             session.PendingPrimaryLoginStartedAt = 0;
+            session.SessionData.GatewayCredential.Clear();
 
             var hasVerifiedDevice =
                 !string.IsNullOrWhiteSpace(session.SessionData.Hwid) &&

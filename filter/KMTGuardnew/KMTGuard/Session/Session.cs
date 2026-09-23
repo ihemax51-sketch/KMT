@@ -124,6 +124,7 @@ namespace KMTGuard.SessionManager
                 AsyncServer.Service.Name, ClientIp, reason);
 
             SessionData.ClearFellowRuntimeState();
+            SessionData.GatewayCredential.Clear();
             PvpChallengeService.HandleSessionStopping(this, reason);
             OfflineStallService.OnSessionStopping(this, reason);
             _shutdown.Cancel();

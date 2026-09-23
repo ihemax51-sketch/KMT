@@ -117,7 +117,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
                 session.PlayerUserID = quickLoginAuth.Username;
                 session.SessionData.user_id = quickLoginAuth.Username;
-                session.SessionData.user_pw = string.Empty;
+                session.SessionData.GatewayCredential.Clear();
                 session.SessionData.locale = quickLoginAuth.Locale;
 
                 await BotProtectionService.PopulateClientlessIdentityAsync(session, quickLoginAuth.Username);
@@ -163,7 +163,6 @@ namespace KMTGuard.Server.AgentPacketHandler
 
             session.PlayerUserID = playerUserId;
             session.SessionData.user_id = playerUserId;
-            session.SessionData.user_pw = password;
             session.SessionData.locale = locale;
             await BotProtectionService.PopulateClientlessIdentityAsync(session, playerUserId);
             if (session.IsManagedClientless)
@@ -180,8 +179,6 @@ namespace KMTGuard.Server.AgentPacketHandler
             {
                 session.SessionData.SecondPwRememberPC = secondaryPasswordData.RememberPC;
             }
-
-            session.SessionData.user_pw = string.Empty;
 
             return new PacketResult(packet, PacketResultType.Nothing);
         }

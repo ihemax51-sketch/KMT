@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Dapper;
+using KMTGuard.Database;
 using KMTGuard.Features.AutoEvents;
 using KMTGuard.Helpers;
 using KMTGuard.Localization;
@@ -244,30 +245,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
                     session.SessionData.IsInParty = false;
                     session.SessionData.IsPartyMaster = false;
-                    await DatabaseJobQueue.RunAsync(() =>
-                    {
-                        try
-                        {
-                            using (var connection = new SqlConnection(Program.Connectionstring))
-                            {
-                                connection.Open(); // OpenAsync() yerine senkron açma daha güvenli
-
-                                using (var command = new SqlCommand(
-                                    @"IF EXISTS (SELECT 1 FROM [dbo].[Party_Members] WITH (NOLOCK) WHERE CharID = @CharID)
-                                      BEGIN DELETE FROM [dbo].[Party_Members] WHERE CharID = @CharID END",
-                                    connection))
-                                {
-                                    command.Parameters.AddWithValue("@CharID", session.SessionData.Charid);
-                                    command.CommandTimeout = 60;
-                                    command.ExecuteNonQuery();
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error($"[dbo].[Party_Members] DELETE işleminde hata: {ex.Message}");
-                        }
-                    });
+                    QueuePartyMemberDelete(session.SessionData.Charid);
                     return new PacketResult(packet, PacketResultType.Nothing);
                 }
 
@@ -281,30 +259,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                     {
                         session.SessionData.IsInParty = false;
                         session.SessionData.IsPartyMaster = false;
-                        await DatabaseJobQueue.RunAsync(() =>
-                        {
-                            try
-                            {
-                                using (var connection = new SqlConnection(Program.Connectionstring))
-                                {
-                                    connection.Open(); // OpenAsync() yerine senkron açma daha güvenli
-
-                                    using (var command = new SqlCommand(
-                                        @"IF EXISTS (SELECT 1 FROM [dbo].[Party_Members] WITH (NOLOCK) WHERE CharID = @CharID)
-                                          BEGIN DELETE FROM [dbo].[Party_Members] WHERE CharID = @CharID END",
-                                        connection))
-                                    {
-                                        command.Parameters.AddWithValue("@CharID", session.SessionData.Charid);
-                                        command.CommandTimeout = 60;
-                                        command.ExecuteNonQuery();
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Error($"[dbo].[Party_Members] DELETE işleminde hata: {ex.Message}");
-                            }
-                        });
+                        QueuePartyMemberDelete(session.SessionData.Charid);
                     }
                     return new PacketResult(packet, PacketResultType.Nothing);
                 }
@@ -316,37 +271,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                     session.SessionData.IsPartyMaster = isMaster == 1;
                     if (nLeaderJID == session.SessionData.JID)
                     {
-                        try
-                        {
-                            using (var connection = new SqlConnection(Program.Connectionstring))
-                            {
-                                await connection.OpenAsync();
-
-                                int PartyID = await connection.QueryFirstOrDefaultAsync<int>(
-                                    "SELECT PartyID FROM [dbo].[Party_Members] WITH (NOLOCK) WHERE CharID = @CharID",
-                                    new { CharID = session.SessionData.Charid }); // Dapper ile parametre geçiliyor
-
-                                if (PartyID > 0)
-                                {
-                                    string query = @"
-                                    IF EXISTS (SELECT 1 FROM [dbo].[Party_Members] WHERE PartyID = @PartyID)
-                                    BEGIN
-                                        UPDATE [dbo].[Party_Members] SET IsMaster = 0 WHERE PartyID = @PartyID;
-                                        UPDATE [dbo].[Party_Members] SET IsMaster = 1 WHERE PartyID = @PartyID AND CharID = @NewLeaderID;
-                                    END";
-
-                                    await connection.ExecuteAsync(query, new
-                                    {
-                                        PartyID = PartyID,
-                                        NewLeaderID = session.SessionData.Charid // Parametre değerleri
-                                    });
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error($"[dbo].[Party_Members] UPDATE işleminde hata: {ex.Message}");
-                        }
+                        QueuePartyLeaderChange(session.SessionData.Charid);
                     }
 
                     //CPartyMgr.UpdatePartyLeader(nMyPartyID, nLeaderID);
@@ -374,58 +299,15 @@ namespace KMTGuard.Server.AgentPacketHandler
                 session.SessionData.IsPartyMaster = isMaster == 1;
                 if (!session.SessionData.IsInParty)
                 {
-                    await DatabaseJobQueue.RunAsync(() =>
-                    {
-                        try
-                        {
-                            using (var connection = new SqlConnection(Program.Connectionstring))
-                            {
-                                connection.Open(); // OpenAsync() yerine senkron açma daha güvenli
-
-                                using (var command = new SqlCommand(
-                                    @"IF NOT EXISTS (SELECT 1 FROM [dbo].[Party_Members] WITH (NOLOCK) WHERE CharID = @CharID)
-                                      BEGIN
-                                          INSERT INTO [dbo].[Party_Members]
-                                              (PartyID, CharID, CharName, PartyType, IsMaster, JobStatus, UpdatedAt)
-                                          VALUES
-                                              (@PartyID, @CharID, @CharName, @PartyType, @IsMaster, @JobStatus, @UpdatedAt)
-                                      END",
-                                    connection))
-                                {
-                                    command.Parameters.AddWithValue("@PartyID", (int)nPartyID);
-                                    command.Parameters.AddWithValue("@CharID", session.SessionData.Charid);
-                                    command.Parameters.AddWithValue("@CharName", session.SessionData.Charname ?? string.Empty);
-                                    command.Parameters.AddWithValue("@PartyType", (byte)eSettingFlags);
-                                    command.Parameters.AddWithValue("@IsMaster", isMaster);
-                                    command.Parameters.AddWithValue("@JobStatus", session.SessionData.JobType);
-                                    command.Parameters.AddWithValue("@UpdatedAt", DateTime.Now);
-                                    command.CommandTimeout = 60;
-                                    command.ExecuteNonQuery();
-                                }
-
-                                // سجل في _PartyMatchingCreated عند أول دخول/إنشاء للحزب
-                                using (var insertCmd = new SqlCommand(@"
-IF NOT EXISTS (SELECT 1 FROM [dbo].[Party_MatchingLog] WITH (NOLOCK) WHERE PartyNo = @PartyNo AND CharID = @CharID)
-BEGIN
-    INSERT INTO [dbo].[Party_MatchingLog] (CharID, CharName, RegionID, WorldID, PartyNo)
-    VALUES (@CharID, @CharName, @RegionID, @WorldID, @PartyNo)
-END", connection))
-                                {
-                                    insertCmd.Parameters.AddWithValue("@PartyNo", (int)nPartyID);
-                                    insertCmd.Parameters.AddWithValue("@CharID", session.SessionData.Charid);
-                                    insertCmd.Parameters.AddWithValue("@CharName", session.SessionData.Charname ?? string.Empty);
-                                    insertCmd.Parameters.AddWithValue("@RegionID", Convert.ToInt16(session.SessionData.LatestRegion));
-                                    insertCmd.Parameters.AddWithValue("@WorldID", session.SessionData.WorldID);
-                                    insertCmd.CommandTimeout = 60;
-                                    insertCmd.ExecuteNonQuery();
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error($"[dbo].[Party_Members]/[dbo].[Party_MatchingLog] INSERT işleminde hata: {ex.Message}");
-                        }
-                    });
+                    QueuePartyMembershipSnapshot(
+                        (int)nPartyID,
+                        session.SessionData.Charid,
+                        session.SessionData.Charname,
+                        (byte)eSettingFlags,
+                        isMaster,
+                        session.SessionData.JobType,
+                        session.SessionData.LatestRegion,
+                        session.SessionData.WorldID);
                     session.SessionData.IsInParty = true;
                 }
 
@@ -475,34 +357,7 @@ END", connection))
                 {
                     int nMatchingID = packet.ReadInt32();
                     AutoEventService.RegisterPartyMatchingFormCreated(session, nMatchingID);
-                    await DatabaseJobQueue.RunAsync(() =>
-                    {
-                        try
-                        {
-                            using (var connection = new SqlConnection(Program.Connectionstring))
-                            {
-                                connection.Open(); // OpenAsync() yerine senkron açma daha güvenli
-
-                                using (var command = new SqlCommand(@"
-INSERT INTO [dbo].[Party_MatchingLog] (CharID, CharName, RegionID, WorldID, PartyNo)
-VALUES (@CharID, @CharName, @RegionID, @WorldID, @PartyNo)", connection))
-                                {
-                                    command.Parameters.AddWithValue("@CharID", session.SessionData.Charid);
-                                    command.Parameters.AddWithValue("@CharName", session.SessionData.Charname ?? string.Empty);
-                                    command.Parameters.AddWithValue("@RegionID", Convert.ToInt16(session.SessionData.LatestRegion));
-                                    command.Parameters.AddWithValue("@WorldID", session.SessionData.WorldID);
-                                    command.Parameters.AddWithValue("@PartyNo", nMatchingID);
-                                    command.CommandTimeout = 60;
-
-                                    command.ExecuteNonQuery();
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error($"[dbo].[Party_MatchingLog] INSERT işleminde hata: {ex.Message}");
-                        }
-                    });
+                    QueuePartyMatchingLog(session, nMatchingID, requireMissing: false);
 
                 }
                 else
@@ -525,38 +380,7 @@ VALUES (@CharID, @CharName, @RegionID, @WorldID, @PartyNo)", connection))
                 byte successflag = packet.ReadUInt8();
                 if (successflag == 1)
                 {
-                    await DatabaseJobQueue.RunAsync(() =>
-                    {
-                        try
-                        {
-                            using (var connection = new SqlConnection(Program.Connectionstring))
-                            {
-                                connection.Open(); // OpenAsync() yerine senkron açma daha güvenli
-
-                                using (var command = new SqlCommand(@"
-IF NOT EXISTS (SELECT 1 FROM [dbo].[Party_MatchingLog] WITH (NOLOCK) WHERE CharID = @CharID AND PartyNo = @PartyNo)
-BEGIN
-    INSERT INTO [dbo].[Party_MatchingLog] (CharID, CharName, RegionID, WorldID, PartyNo)
-    VALUES (@CharID, @CharName, @RegionID, @WorldID, @PartyNo)
-END", connection))
-                                {
-                                    // PartyNo هنا سيتم تسجيله لاحقًا بدقة في HandlePartyInfoAck، نضع 0 مؤقتًا لتسجيل حدث الإنشاء
-                                    command.Parameters.AddWithValue("@CharID", session.SessionData.Charid);
-                                    command.Parameters.AddWithValue("@CharName", session.SessionData.Charname ?? string.Empty);
-                                    command.Parameters.AddWithValue("@RegionID", Convert.ToInt16(session.SessionData.LatestRegion));
-                                    command.Parameters.AddWithValue("@WorldID", session.SessionData.WorldID);
-                                    command.Parameters.AddWithValue("@PartyNo", 0);
-                                    command.CommandTimeout = 60;
-
-                                    command.ExecuteNonQuery();
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Error($"[dbo].[Party_MatchingLog] INSERT (create) işleminde hata: {ex.Message}");
-                        }
-                    });
+                    QueuePartyMatchingLog(session, 0, requireMissing: true);
 
                 }
 
@@ -575,36 +399,7 @@ END", connection))
                 byte successflag = packet.ReadUInt8();
                 if (successflag == 1)
                 {
-                    await DatabaseJobQueue.RunAsync(() =>
-                    {
-                        try
-                        {
-                            using (var connection = new SqlConnection(Program.Connectionstring))
-                            {
-                                connection.Open(); // OpenAsync() yerine senkron açma daha güvenli
-
-                                using (var command = new SqlCommand(
-                                    "EXEC [dbo].[Hook_PartyJoin] @CharID, @CharName, @CurrentRegionId, @CurrentWorldId, @PVPState, @CurrentJobType", connection))
-                                {
-                                    command.Parameters.AddWithValue("@CharID", session.SessionData.Charid);
-                                    command.Parameters.AddWithValue("@CharName", session.SessionData.Charname);
-                                    command.Parameters.AddWithValue("@CurrentRegionId", Convert.ToInt16(session.SessionData.LatestRegion));
-                                    command.Parameters.AddWithValue("@CurrentWorldId", session.SessionData.WorldID);
-                                    command.Parameters.AddWithValue("@PVPState", Convert.ToByte(session.SessionData.State.PvpCape));
-                                    command.Parameters.AddWithValue("@CurrentJobType", Convert.ToByte(session.SessionData.JobType));
-
-
-                                    command.CommandTimeout = 60;
-
-                                    command.ExecuteNonQuery();
-                                }
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                        Log.Error($"[dbo].[Hook_PartyJoin] işleminde hata: {ex.Message}");
-                        }
-                    });
+                    QueuePartyJoin(session);
                 }
 
             }
@@ -614,6 +409,138 @@ END", connection))
             }
 
             return new PacketResult();
+        }
+
+        private static void QueuePartyMemberDelete(int charId)
+        {
+            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            {
+                await using var connection = new SqlConnection(Program.Connectionstring);
+                await connection.OpenAsync(cancellationToken);
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "DELETE FROM [dbo].[Party_Members] WHERE CharID = @CharID",
+                    new { CharID = charId },
+                    commandTimeout: SqlExecutionPolicy.BackgroundSeconds,
+                    cancellationToken: cancellationToken));
+            }, operation: "party member delete bookkeeping");
+        }
+
+        private static void QueuePartyLeaderChange(int charId)
+        {
+            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            {
+                await using var connection = new SqlConnection(Program.Connectionstring);
+                await connection.OpenAsync(cancellationToken);
+                await connection.ExecuteAsync(new CommandDefinition(@"
+DECLARE @PartyID int = (
+    SELECT PartyID FROM [dbo].[Party_Members] WITH (NOLOCK) WHERE CharID = @CharID);
+IF @PartyID > 0
+BEGIN
+    UPDATE [dbo].[Party_Members] SET IsMaster = 0 WHERE PartyID = @PartyID;
+    UPDATE [dbo].[Party_Members] SET IsMaster = 1 WHERE PartyID = @PartyID AND CharID = @CharID;
+END",
+                    new { CharID = charId },
+                    commandTimeout: SqlExecutionPolicy.BackgroundSeconds,
+                    cancellationToken: cancellationToken));
+            }, operation: "party leader bookkeeping");
+        }
+
+        private static void QueuePartyMembershipSnapshot(
+            int partyId,
+            int charId,
+            string charName,
+            byte partyType,
+            int isMaster,
+            byte jobStatus,
+            int regionId,
+            int worldId)
+        {
+            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            {
+                await using var connection = new SqlConnection(Program.Connectionstring);
+                await connection.OpenAsync(cancellationToken);
+                await connection.ExecuteAsync(new CommandDefinition(@"
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Party_Members] WITH (NOLOCK) WHERE CharID = @CharID)
+BEGIN
+    INSERT INTO [dbo].[Party_Members]
+        (PartyID, CharID, CharName, PartyType, IsMaster, JobStatus, UpdatedAt)
+    VALUES
+        (@PartyID, @CharID, @CharName, @PartyType, @IsMaster, @JobStatus, @UpdatedAt)
+END;
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Party_MatchingLog] WITH (NOLOCK) WHERE PartyNo = @PartyID AND CharID = @CharID)
+BEGIN
+    INSERT INTO [dbo].[Party_MatchingLog] (CharID, CharName, RegionID, WorldID, PartyNo)
+    VALUES (@CharID, @CharName, @RegionID, @WorldID, @PartyID)
+END",
+                    new
+                    {
+                        PartyID = partyId,
+                        CharID = charId,
+                        CharName = charName ?? string.Empty,
+                        PartyType = partyType,
+                        IsMaster = isMaster,
+                        JobStatus = jobStatus,
+                        UpdatedAt = DateTime.Now,
+                        RegionID = Convert.ToInt16(regionId),
+                        WorldID = worldId
+                    },
+                    commandTimeout: SqlExecutionPolicy.BackgroundSeconds,
+                    cancellationToken: cancellationToken));
+            }, operation: "party membership bookkeeping");
+        }
+
+        private static void QueuePartyMatchingLog(ISession session, int partyNo, bool requireMissing)
+        {
+            int charId = session.SessionData.Charid;
+            string charName = session.SessionData.Charname;
+            short regionId = Convert.ToInt16(session.SessionData.LatestRegion);
+            int worldId = session.SessionData.WorldID;
+            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            {
+                await using var connection = new SqlConnection(Program.Connectionstring);
+                await connection.OpenAsync(cancellationToken);
+                string sql = requireMissing
+                    ? @"IF NOT EXISTS (SELECT 1 FROM [dbo].[Party_MatchingLog] WITH (NOLOCK) WHERE CharID = @CharID AND PartyNo = @PartyNo)
+BEGIN
+    INSERT INTO [dbo].[Party_MatchingLog] (CharID, CharName, RegionID, WorldID, PartyNo)
+    VALUES (@CharID, @CharName, @RegionID, @WorldID, @PartyNo)
+END"
+                    : @"INSERT INTO [dbo].[Party_MatchingLog] (CharID, CharName, RegionID, WorldID, PartyNo)
+VALUES (@CharID, @CharName, @RegionID, @WorldID, @PartyNo)";
+                await connection.ExecuteAsync(new CommandDefinition(
+                    sql,
+                    new { CharID = charId, CharName = charName, RegionID = regionId, WorldID = worldId, PartyNo = partyNo },
+                    commandTimeout: SqlExecutionPolicy.BackgroundSeconds,
+                    cancellationToken: cancellationToken));
+            }, operation: "party matching bookkeeping");
+        }
+
+        private static void QueuePartyJoin(ISession session)
+        {
+            int charId = session.SessionData.Charid;
+            string charName = session.SessionData.Charname;
+            short regionId = Convert.ToInt16(session.SessionData.LatestRegion);
+            int worldId = session.SessionData.WorldID;
+            byte pvpState = Convert.ToByte(session.SessionData.State.PvpCape);
+            byte jobType = Convert.ToByte(session.SessionData.JobType);
+            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            {
+                await using var connection = new SqlConnection(Program.Connectionstring);
+                await connection.OpenAsync(cancellationToken);
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "EXEC [dbo].[Hook_PartyJoin] @CharID, @CharName, @CurrentRegionId, @CurrentWorldId, @PVPState, @CurrentJobType",
+                    new
+                    {
+                        CharID = charId,
+                        CharName = charName,
+                        CurrentRegionId = regionId,
+                        CurrentWorldId = worldId,
+                        PVPState = pvpState,
+                        CurrentJobType = jobType
+                    },
+                    commandTimeout: SqlExecutionPolicy.BackgroundSeconds,
+                    cancellationToken: cancellationToken));
+            }, operation: "party join bookkeeping");
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using KMTGuard.CommandManager;
 using KMTGuard.ConsoleUi;
+using KMTGuard.Database;
 using KMTGuard.Helpers;
 using KMTGuard.Localization;
 using KMTGuard.Runtime;
@@ -255,7 +256,8 @@ public static class Program
             MaxPoolSize = maximumPool,
             MinPoolSize = minimumPool,
             LoadBalanceTimeout = settings.Settings.ConnectionLifetime,
-            ConnectTimeout = 10
+            ConnectTimeout = 10,
+            CommandTimeout = SqlExecutionPolicy.BackgroundSeconds
         };
         Connectionstring = connectionBuilder.ConnectionString;
         sqlPassword = string.Empty;
