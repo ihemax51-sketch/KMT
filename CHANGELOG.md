@@ -4,6 +4,12 @@
 
 Release date: 2026-09-21
 
+### Client DLL build correction - 2026-09-23 (developer build)
+
+- Corrected the Client DLL automation source so the pickup and character-entry systems compile together without changing their intended behavior.
+- Verified the complete Client DLL package builds successfully for Windows deployment.
+- Requirement: replace the Client DLL and reopen the game client. No Filter restart, server restart, SQL update, or media update is required.
+
 ### GameServer deep audit - 2026-09-23 (developer documentation)
 
 - Completed an independent source audit of GameServer threads, packets, native objects, database access, custom systems, performance, memory ownership, and restart behavior.
