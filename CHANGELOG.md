@@ -1,5 +1,17 @@
 # KMTGuard Update History
 
+## Update v7.0.3
+
+Release date: 2026-09-23
+
+### Filter persistence and packet-flow corrections
+
+- Kept authoritative alchemy and fellow-pet updates responsive when optional Filter database bookkeeping is slow.
+- Prevented title, icon, and saved reverse-location changes from becoming visible before their required database update succeeds.
+- Preserved authoritative party transition order in background bookkeeping without serializing unrelated characters or increasing database worker counts.
+- Cleared reusable Gateway credentials immediately after terminal Quick Login and secondary-password failures while retaining them only for valid retryable challenges.
+- Requirement: replace and restart all Filter role executables together after Windows staging. No SQL update, Client DLL replacement, media update, GameServer add-on replacement, or ShardManager add-on replacement is required.
+
 ## Update v7.0.2
 
 Release date: 2026-09-23

@@ -208,7 +208,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
                 if (session.SessionData.CharacterNewReverseSavedLocations.ContainsKey(locationID))
                 {
-                    session.SessionData.CharacterNewReverseSavedLocations.TryRemove(locationID, out _);
+                    int characterId = session.SessionData.Charid;
                     await DatabaseJobQueue.RunAsync(() =>
                     {
                         try
@@ -221,7 +221,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                                     "DELETE FROM [dbo].[Teleport_SavedLocations] WHERE CharID = @CharID AND LocationID = @LocationID",
                                     connection))
                                 {
-                                    command.Parameters.AddWithValue("@CharID", session.SessionData.Charid);
+                                    command.Parameters.AddWithValue("@CharID", characterId);
                                     command.Parameters.AddWithValue("@LocationID", locationID);
                                     command.CommandTimeout = 60;
                                     command.ExecuteNonQuery();
@@ -231,8 +231,10 @@ namespace KMTGuard.Server.AgentPacketHandler
                         catch (Exception ex)
                         {
                             Log.Error($"HandleHwidList hata: {ex.Message}");
+                            throw;
                         }
                     });
+                    session.SessionData.CharacterNewReverseSavedLocations.TryRemove(locationID, out _);
                 }
             }
             catch (Exception ex)
@@ -310,6 +312,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                             catch (Exception ex)
                             {
                                 Log.Error($"newreverse hata: {ex.Message}");
+                                throw;
                             }
                         });
 

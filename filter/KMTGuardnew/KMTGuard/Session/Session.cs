@@ -182,27 +182,44 @@ namespace KMTGuard.SessionManager
         {
             try
             {
+                int characterId = SessionData.Charid;
+                if (SessionData.IsInParty && characterId > 0)
+                {
+                    var partyCleanupCompleted = new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously);
+                    bool queued = KeyedDatabaseJobQueue.TryQueueBackground(characterId, async cancellationToken =>
+                    {
+                        try
+                        {
+                            await using var partyConnection = new SqlConnection(Program.Connectionstring);
+                            await partyConnection.OpenAsync(cancellationToken);
+                            await partyConnection.ExecuteAsync(new CommandDefinition(
+                                "DELETE FROM [dbo].[Party_Members] WHERE CharID = @CharID",
+                                new { CharID = characterId },
+                                commandTimeout: 30,
+                                cancellationToken: cancellationToken));
+                        }
+                        finally
+                        {
+                            partyCleanupCompleted.TrySetResult(true);
+                        }
+                    }, operation: "ordered party disconnect cleanup");
+
+                    if (queued)
+                        await partyCleanupCompleted.Task.ConfigureAwait(false);
+                }
+
                 await DatabaseJobQueue.RunIdempotentAsync(async cancellationToken =>
                 {
                     await using var connection = new SqlConnection(Program.Connectionstring);
                     await connection.OpenAsync(cancellationToken);
 
-                    if (SessionData.IsInParty)
-                    {
-                        await connection.ExecuteAsync(
-                            new CommandDefinition(
-                                "DELETE FROM [dbo].[Party_Members] WHERE CharID = @CharID",
-                                new { CharID = SessionData.Charid },
-                                commandTimeout: 30,
-                                cancellationToken: cancellationToken));
-                    }
-
-                    if (SessionData.Charid > 0)
+                    if (characterId > 0)
                     {
                         await connection.ExecuteAsync(
                             new CommandDefinition(
                                 "UPDATE [dbo].[Auth_HWIDs] SET Active = 0 WHERE CharID = @CharID",
-                                new { CharID = SessionData.Charid },
+                                new { CharID = characterId },
                                 commandTimeout: 10,
                                 cancellationToken: cancellationToken));
                     }

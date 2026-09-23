@@ -413,7 +413,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
         private static void QueuePartyMemberDelete(int charId)
         {
-            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            KeyedDatabaseJobQueue.TryQueueBackground(charId, async cancellationToken =>
             {
                 await using var connection = new SqlConnection(Program.Connectionstring);
                 await connection.OpenAsync(cancellationToken);
@@ -427,7 +427,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
         private static void QueuePartyLeaderChange(int charId)
         {
-            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            KeyedDatabaseJobQueue.TryQueueBackground(charId, async cancellationToken =>
             {
                 await using var connection = new SqlConnection(Program.Connectionstring);
                 await connection.OpenAsync(cancellationToken);
@@ -455,7 +455,7 @@ END",
             int regionId,
             int worldId)
         {
-            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            KeyedDatabaseJobQueue.TryQueueBackground(charId, async cancellationToken =>
             {
                 await using var connection = new SqlConnection(Program.Connectionstring);
                 await connection.OpenAsync(cancellationToken);
@@ -495,7 +495,7 @@ END",
             string charName = session.SessionData.Charname;
             short regionId = Convert.ToInt16(session.SessionData.LatestRegion);
             int worldId = session.SessionData.WorldID;
-            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            KeyedDatabaseJobQueue.TryQueueBackground(charId, async cancellationToken =>
             {
                 await using var connection = new SqlConnection(Program.Connectionstring);
                 await connection.OpenAsync(cancellationToken);
@@ -523,7 +523,7 @@ VALUES (@CharID, @CharName, @RegionID, @WorldID, @PartyNo)";
             int worldId = session.SessionData.WorldID;
             byte pvpState = Convert.ToByte(session.SessionData.State.PvpCape);
             byte jobType = Convert.ToByte(session.SessionData.JobType);
-            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            KeyedDatabaseJobQueue.TryQueueBackground(charId, async cancellationToken =>
             {
                 await using var connection = new SqlConnection(Program.Connectionstring);
                 await connection.OpenAsync(cancellationToken);

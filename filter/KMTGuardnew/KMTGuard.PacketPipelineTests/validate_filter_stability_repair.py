@@ -21,7 +21,16 @@ checks = {
         ["CancelledBeforeStart", "TryCancelBeforeStart", "await completion.Task"]),
     "party packets independent from bookkeeping": (
         ROOT / "KMTGuard/Server/AgentServer/PacketHandler/Party/PartyData.cs",
-        ["QueuePartyMemberDelete", "TryQueueBackground", "SqlExecutionPolicy.BackgroundSeconds"]),
+        ["QueuePartyMemberDelete", "KeyedDatabaseJobQueue.TryQueueBackground", "SqlExecutionPolicy.BackgroundSeconds"]),
+    "party bookkeeping preserves per-character order": (
+        ROOT / "KMTGuard/Helpers/KeyedDatabaseJobQueue.cs",
+        ["predecessor.WaitAsync", "RunContinuationsAsynchronously", "States.Remove(key)"]),
+    "authoritative server packets bypass bookkeeping waits": (
+        ROOT / "KMTGuard/Server/AgentServer/PacketHandler/COS/COSPackets.cs",
+        ["await session.SendToClient(new Packet(packet))", "fellow skill persistence bookkeeping"]),
+    "durable state follows persistence": (
+        ROOT / "KMTGuard/Server/AgentServer/PacketHandler/UI/Title_IconManagers.cs",
+        ["throw;", "targetCache[characterName] = ownedIcon.IconID"]),
     "runtime request authentication": (
         ROOT / "KMTGuard.RuntimeContract/RuntimeContracts.cs",
         ["RuntimeRequestAuthentication.Sign", "AuthenticationTag"]),
@@ -58,12 +67,12 @@ for name, (path, needles) in checks.items():
             failed.append(f"{name}: missing {needle!r}")
 
 version = (ROOT.parent.parent / "VERSION.txt").read_text(encoding="utf-8-sig").strip()
-if version != "7.0.2":
-    failed.append(f"release version mismatch: expected 7.0.2, found {version!r}")
+if version != "7.0.3":
+    failed.append(f"release version mismatch: expected 7.0.3, found {version!r}")
 
 changelog = (ROOT.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8-sig")
-if "## Update v7.0.2" not in changelog:
-    failed.append("release changelog is missing v7.0.2")
+if "## Update v7.0.3" not in changelog:
+    failed.append("release changelog is missing v7.0.3")
 if any(marker in changelog for marker in ("<<<<<<<", "=======", ">>>>>>>")):
     failed.append("release changelog still contains merge-conflict markers")
 

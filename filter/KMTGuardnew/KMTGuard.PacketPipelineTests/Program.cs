@@ -34,6 +34,7 @@ await VerifyServerBlockStopsPipeline();
 await VerifyInternalPacketAuthentication();
 await VerifyDelayedJobScheduling();
 await VerifyDatabaseJobLifecycle();
+await VerifyKeyedDatabaseJobOrdering();
 await VerifyConcurrentPacketFinalization();
 VerifyGatewayCredentialLifecycle();
 VerifyRuntimeControlAuthentication();
@@ -155,6 +156,37 @@ static void VerifyGatewayCredentialLifecycle()
         () => credential.Reveal(),
         "A cleared Gateway credential remained readable.");
     credential.Clear();
+}
+
+static async Task VerifyKeyedDatabaseJobOrdering()
+{
+    var releaseFirst = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var unrelatedCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var order = new ConcurrentQueue<int>();
+
+    Assert(KeyedDatabaseJobQueue.TryQueueBackground(101, async _ =>
+    {
+        await releaseFirst.Task;
+        order.Enqueue(1);
+    }, "ordered test first"), "First keyed database job was not queued.");
+    Assert(KeyedDatabaseJobQueue.TryQueueBackground(101, _ =>
+    {
+        order.Enqueue(2);
+        completed.TrySetResult();
+        return Task.CompletedTask;
+    }, "ordered test second"), "Second keyed database job was not queued.");
+    Assert(KeyedDatabaseJobQueue.TryQueueBackground(202, _ =>
+    {
+        unrelatedCompleted.TrySetResult();
+        return Task.CompletedTask;
+    }, "ordered test unrelated"), "Unrelated keyed database job was not queued.");
+
+    await unrelatedCompleted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    Assert(!completed.Task.IsCompleted, "A same-key database job overtook its predecessor.");
+    releaseFirst.TrySetResult();
+    await completed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    Assert(order.SequenceEqual(new[] { 1, 2 }), "Same-key database jobs did not preserve enqueue order.");
 }
 VerifyExternalBotPacketCompatibility();
 

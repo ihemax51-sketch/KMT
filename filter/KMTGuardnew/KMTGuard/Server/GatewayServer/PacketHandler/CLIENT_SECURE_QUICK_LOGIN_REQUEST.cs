@@ -362,6 +362,8 @@ public partial class SERVER_DLL_SETTINGS_RESPONSE
         }
         catch (Exception ex)
         {
+            session.PendingQuickLogin = false;
+            session.SessionData.GatewayCredential.Clear();
             Log.Warning(ex, "CLIENT_QUICK_LOGIN failed for {ClientIp}", session.ClientIp);
             await SendQuickLoginResult(session, false, PlayerLanguage.Get("QuickLogin.Failed"));
             return new PacketResult(PacketResultType.Block);

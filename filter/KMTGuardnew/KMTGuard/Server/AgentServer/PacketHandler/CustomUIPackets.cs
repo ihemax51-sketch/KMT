@@ -942,6 +942,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                                 catch (Exception ex)
                                 {
                                     Log.Error($"HandleHwidList hata: {ex.Message}");
+                                    throw;
                                 }
                             });
                         }
@@ -993,6 +994,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                     catch (Exception ex)
                     {
                         Log.Error($"HandleHwidList hata: {ex.Message}");
+                        throw;
                     }
                 });
             }
@@ -1334,6 +1336,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                             {
                                 Log.Error(ex, "Failed to remove active achievement title for {CharacterName}",
                                     session.SessionData.Charname);
+                                throw;
                             }
                         });
 
@@ -1398,6 +1401,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                         {
                             Log.Error(ex, "Failed to activate achievement tag {TagID} for {CharacterName}",
                                 TagID, session.SessionData.Charname);
+                            throw;
                         }
                     });
 
@@ -1455,6 +1459,7 @@ namespace KMTGuard.Server.AgentPacketHandler
                             catch (Exception ex)
                             {
                                 Log.Error($"HandleHwidList hata: {ex.Message}");
+                                throw;
                             }
                         });
                     }
@@ -1600,8 +1605,6 @@ namespace KMTGuard.Server.AgentPacketHandler
                     bool SecondaryPWRememberPC = packet.ReadBool();
                     if (session.SessionData.HideCharInformation != Value)
                     {
-                        session.SessionData.HideCharInformation = Value;
-
                         await DatabaseJobQueue.RunAsync(() =>
                         {
                             try
@@ -1619,8 +1622,10 @@ namespace KMTGuard.Server.AgentPacketHandler
                             catch (Exception ex)
                             {
                                 Log.Error($"HandleHwidList hata: {ex.Message}");
+                                throw;
                             }
                         });
+                        session.SessionData.HideCharInformation = Value;
                     }
 
 

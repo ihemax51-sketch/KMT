@@ -171,6 +171,8 @@ namespace KMTGuard.Server.GatewayPacketHandler
                     session.SessionData.user_id, session.ClientIp, session.DeviceKeyThumbprint);
                 if (blockedUntil.HasValue)
                 {
+                    session.PendingQuickLogin = false;
+                    session.SessionData.GatewayCredential.Clear();
                     await SendSecurityMessageAsync(session, "Security.SecondaryTemporarilyLocked");
                     return new PacketResult(PacketResultType.Block);
                 }
@@ -299,6 +301,8 @@ namespace KMTGuard.Server.GatewayPacketHandler
             }
             catch (Exception EX)
             {
+                session.PendingQuickLogin = false;
+                session.SessionData.GatewayCredential.Clear();
                 Log.Warning(EX, "Secondary-password security operation failed for {ClientIp}", session.ClientIp);
                 await SendSecurityMessageAsync(session, "Security.AuthenticationUnavailable");
                 return new PacketResult(PacketResultType.Disconnect);
@@ -316,7 +320,11 @@ namespace KMTGuard.Server.GatewayPacketHandler
             var blockedUntil = await sqlQueryHelper.RegisterSecondaryPasswordFailureAsync(
                 session.SessionData.user_id, session.ClientIp, session.DeviceKeyThumbprint);
             if (blockedUntil.HasValue)
+            {
+                session.PendingQuickLogin = false;
+                session.SessionData.GatewayCredential.Clear();
                 await SendSecurityMessageAsync(session, "Security.SecondaryTemporarilyLocked");
+            }
 
             Packet pck = new Packet(0x1212);
             pck.WriteUInt8(SecondaryPasswordResponse.WRONG_PASSWORD);

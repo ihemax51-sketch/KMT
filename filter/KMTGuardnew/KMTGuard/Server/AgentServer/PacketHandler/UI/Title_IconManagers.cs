@@ -37,12 +37,8 @@ namespace KMTGuard.Server.AgentPacketHandler
                     var activeIcons = side == 0
                         ? RefManager.ActiveLeftIcons
                         : RefManager.ActiveRightIcons;
-                    if (!activeIcons.TryRemove(characterName, out _))
+                    if (!activeIcons.ContainsKey(characterName))
                         return new PacketResult(PacketResultType.Block);
-
-                    Packet removePacket = new Packet((ushort)(side == 0 ? 0x174A : 0x174E));
-                    removePacket.WriteAscii(characterName);
-                    await ServerManager.BroadcastPacket(removePacket);
 
                     await DatabaseJobQueue.RunAsync(() =>
                     {
@@ -63,8 +59,13 @@ namespace KMTGuard.Server.AgentPacketHandler
                                 "Failed to deactivate {Side} icon for {CharacterName}",
                                 side == 0 ? "left" : "right",
                                 characterName);
+                            throw;
                         }
                     });
+                    activeIcons.TryRemove(characterName, out _);
+                    Packet removePacket = new Packet((ushort)(side == 0 ? 0x174A : 0x174E));
+                    removePacket.WriteAscii(characterName);
+                    await ServerManager.BroadcastPacket(removePacket);
                     return new PacketResult(PacketResultType.Block);
                 }
 
@@ -82,12 +83,6 @@ namespace KMTGuard.Server.AgentPacketHandler
                 {
                     return new PacketResult(PacketResultType.Block);
                 }
-
-                targetCache[characterName] = ownedIcon.IconID;
-                Packet activatePacket = new Packet((ushort)(side == 0 ? 0x173F : 0x174B));
-                activatePacket.WriteAscii(characterName);
-                activatePacket.WriteInt32(ownedIcon.IconID);
-                await ServerManager.BroadcastPacket(activatePacket);
 
                 await DatabaseJobQueue.RunAsync(() =>
                 {
@@ -107,15 +102,21 @@ namespace KMTGuard.Server.AgentPacketHandler
                             },
                             commandTimeout: 60);
                     }
-                    catch (Exception ex)
+                        catch (Exception ex)
                     {
                         Log.Error(ex,
                             "Failed to activate {Side} icon {IconID} for {CharacterName}",
                             side == 0 ? "left" : "right",
-                            ownedIcon.IconID,
-                            characterName);
-                    }
-                });
+                                ownedIcon.IconID,
+                                characterName);
+                            throw;
+                        }
+                    });
+                targetCache[characterName] = ownedIcon.IconID;
+                Packet activatePacket = new Packet((ushort)(side == 0 ? 0x173F : 0x174B));
+                activatePacket.WriteAscii(characterName);
+                activatePacket.WriteInt32(ownedIcon.IconID);
+                await ServerManager.BroadcastPacket(activatePacket);
             }
             catch (Exception EX)
             {
@@ -162,13 +163,6 @@ namespace KMTGuard.Server.AgentPacketHandler
                     {
                         if (RefManager.ActiveTitleColors.ContainsKey(session.SessionData.Charname))
                         {
-                    RefManager.ActiveTitleColors.TryRemove(session.SessionData.Charname, out _);
-
-
-                            Packet stAckMsg = new Packet(0x170B);
-                            stAckMsg.WriteAscii(session.SessionData.Charname);
-                            await ServerManager.BroadcastPacket(stAckMsg);
-
                             await DatabaseJobQueue.RunAsync(() =>
                             {
                                 try
@@ -186,8 +180,13 @@ namespace KMTGuard.Server.AgentPacketHandler
                                 catch (Exception ex)
                                 {
                                     Log.Error($"HandleHwidList hata: {ex.Message}");
+                                    throw;
                                 }
                             });
+                            RefManager.ActiveTitleColors.TryRemove(session.SessionData.Charname, out _);
+                            Packet stAckMsg = new Packet(0x170B);
+                            stAckMsg.WriteAscii(session.SessionData.Charname);
+                            await ServerManager.BroadcastPacket(stAckMsg);
                             return new PacketResult(PacketResultType.Block);
                         }
                     }
@@ -198,13 +197,6 @@ namespace KMTGuard.Server.AgentPacketHandler
                         {
                             int argbInputColor = Int32.Parse(session.SessionData.PlayerTitleColors[DBID].ColorCode.Replace("#", ""), NumberStyles.HexNumber);
 
-                            Packet stAckMsg = new Packet(0x170A);
-                            stAckMsg.WriteAscii(session.SessionData.Charname);
-                            stAckMsg.WriteUInt32(argbInputColor);
-                            await ServerManager.BroadcastPacket(stAckMsg);
-
-                            RefManager.ActiveTitleColors[session.SessionData.Charname] =
-                                session.SessionData.PlayerTitleColors[DBID].ColorCode;
                             await DatabaseJobQueue.RunAsync(() =>
                             {
                                 try
@@ -227,8 +219,15 @@ namespace KMTGuard.Server.AgentPacketHandler
                                 catch (Exception ex)
                                 {
                                     Log.Error($"[dbo].[TitleColor_Activate] failed: {ex.Message}");
+                                    throw;
                                 }
                             });
+                            RefManager.ActiveTitleColors[session.SessionData.Charname] =
+                                session.SessionData.PlayerTitleColors[DBID].ColorCode;
+                            Packet stAckMsg = new Packet(0x170A);
+                            stAckMsg.WriteAscii(session.SessionData.Charname);
+                            stAckMsg.WriteUInt32(argbInputColor);
+                            await ServerManager.BroadcastPacket(stAckMsg);
                             return new PacketResult(PacketResultType.Block);
                         }
                     }
