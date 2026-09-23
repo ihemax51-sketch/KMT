@@ -48,6 +48,7 @@ public:
     void HandleCustomScrollUsage(CMsg*pmsg);
     void HandleItemLockRequest(CMsg*pmsg);
     void HandleItemUnlockRequest(CMsg*pmsg);
+    static void FlushItemLockCompletions();
     void HandleAlchemyLinkRequest(CMsg*pmsg);
     void HandleNewAlchemyRequest(CMsg*pmsg);
     void HandleDisplayCharInfoRequest(CMsg*pmsg);

@@ -1,5 +1,19 @@
 # KMTGuard Update History
 
+## Update v7.0.4
+
+Release date: 2026-09-23
+
+### GameServer lifecycle and gameplay reliability
+
+- Made GameServer protection startup single-owner and fail-closed while privileged commands wait for security initialization.
+- Moved item lock and unlock persistence to a bounded database worker so database delays no longer block native packet processing.
+- Prevented failed Reverse teleports from consuming a scroll or publishing a successful-use effect.
+- Delivered live damage rankings to every active encounter participant and preserved correct ranking beyond the 32-bit damage boundary while retaining the existing client packet format.
+- Aligned unique-spawn replay retention with its configured character cooldown without weakening authorization, location checks, or global pacing.
+- Made telemetry shutdown and restart ownership deterministic, including safe terminal behavior when file output cannot stop promptly.
+- Requirement: replace and restart every GameServer add-on after Windows staging. No SQL update, Filter restart, Client DLL replacement, media update, or ShardManager replacement is required.
+
 ## Update v7.0.3
 
 Release date: 2026-09-23

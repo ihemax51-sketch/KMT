@@ -26,6 +26,9 @@ namespace
     HANDLE s_telemetryWakeEvent = NULL;
     HANDLE s_telemetryStopEvent = NULL;
     HANDLE s_telemetryThread = NULL;
+    // 0=stopped, 1=running, 2=stopping, 3=terminal after an unsafe-to-clean timeout,
+    // 4=initializing. A terminal process-lifetime instance is never restarted.
+    volatile LONG s_telemetryState = 0;
     size_t s_telemetryHead = 0, s_telemetryTail = 0, s_telemetryCount = 0;
     volatile LONG s_telemetryDropped = 0;
     volatile LONG s_uniqueSpawnRejected[7] = { 0 };
@@ -518,12 +521,22 @@ namespace
 
 void GameServerTelemetry::Initialize()
 {
-    if (s_telemetryThread == NULL)
+    if (InterlockedCompareExchange(&s_telemetryState, 4, 0) == 0)
     {
         s_telemetryStopEvent = CreateEventA(NULL, TRUE, FALSE, NULL);
         s_telemetryWakeEvent = CreateEventA(NULL, FALSE, FALSE, NULL);
         if (s_telemetryStopEvent != NULL && s_telemetryWakeEvent != NULL)
             s_telemetryThread = CreateThread(NULL, 0, TelemetryWriter, NULL, 0, NULL);
+        if (s_telemetryThread != NULL)
+            InterlockedExchange(&s_telemetryState, 1);
+        else
+        {
+            if (s_telemetryWakeEvent != NULL) CloseHandle(s_telemetryWakeEvent);
+            if (s_telemetryStopEvent != NULL) CloseHandle(s_telemetryStopEvent);
+            s_telemetryWakeEvent = NULL;
+            s_telemetryStopEvent = NULL;
+            InterlockedExchange(&s_telemetryState, 0);
+        }
     }
     QueryPerformanceFrequency(&s_performanceFrequency);
     SYSTEM_INFO systemInfo;
@@ -547,15 +560,28 @@ void GameServerTelemetry::Initialize()
 
 void GameServerTelemetry::Shutdown()
 {
+    const LONG previous = InterlockedCompareExchange(&s_telemetryState, 2, 1);
+    if (previous == 0 || previous == 2 || previous == 3)
+        return;
+    if (previous != 1)
+        return;
     if (s_telemetryStopEvent != NULL) SetEvent(s_telemetryStopEvent);
     if (s_telemetryThread != NULL)
     {
         if (WaitForSingleObject(s_telemetryThread, 5000) != WAIT_OBJECT_0)
-            return; // Retain every synchronization object beneath a stuck writer.
+        {
+            // The DLL is process-lifetime pinned. Retain handles beneath the live
+            // writer and make the subsystem terminal rather than permitting an
+            // unsafe duplicate writer or closing objects still in use.
+            InterlockedExchange(&s_telemetryState, 3);
+            return;
+        }
         CloseHandle(s_telemetryThread); s_telemetryThread = NULL;
     }
     if (s_telemetryWakeEvent != NULL) { CloseHandle(s_telemetryWakeEvent); s_telemetryWakeEvent = NULL; }
     if (s_telemetryStopEvent != NULL) { CloseHandle(s_telemetryStopEvent); s_telemetryStopEvent = NULL; }
+    s_telemetryHead = s_telemetryTail = s_telemetryCount = 0;
+    InterlockedExchange(&s_telemetryState, 0);
 }
 
 void GameServerTelemetry::RecordMalformedPacket()

@@ -26,7 +26,7 @@ Assert-True $handlerMatch.Success 'The custom Reverse teleport handler is missin
 $handler = $handlerMatch.Groups['Body'].Value
 
 $deleteIndex = $handler.IndexOf('this->SetLiveDeleteItem(SlotID, 1);')
-$effectIndex = $handler.IndexOf('this->SendMsg(pMsg32);')
+$effectIndex = $handler.IndexOf('this->SendMsg(effect);')
 $moveIndex = $handler.IndexOf('this->MoveTo(targetWorldId')
 $approvalIndex = $handler.IndexOf('admissionApproved != 1')
 
@@ -34,8 +34,9 @@ Assert-True ($approvalIndex -ge 0) 'Reverse teleport must require explicit Filte
 Assert-True ($deleteIndex -ge 0) 'Reverse teleport must consume its validated scroll.'
 Assert-True ($approvalIndex -lt $deleteIndex) 'Reverse admission must be validated before the scroll is consumed.'
 Assert-True ($effectIndex -gt $deleteIndex) 'Reverse teleport must send its item-use effect after consuming the scroll.'
-Assert-True ($moveIndex -gt $effectIndex) 'Reverse inventory and effect work must finish before the world-transfer handshake starts.'
-Assert-True ($handler.Substring($moveIndex) -notmatch 'SetLiveDeleteItem|SendMsg\(pMsg32\)') 'Reverse teleport must not mutate inventory or send the use effect after world transfer starts.'
+Assert-True ($moveIndex -lt $deleteIndex) 'Reverse movement admission must succeed before the scroll is consumed.'
+Assert-True ($handler.IndexOf('if (!moved)', $moveIndex) -lt $deleteIndex) 'Both failed movement modes must return before item consumption.'
+Assert-True ($handler.IndexOf('reverseItem->ID64 != reverseItemId', $moveIndex) -lt $deleteIndex) 'The reserved item identity must be revalidated before consumption.'
 
 Assert-True ($source -match '#define\s+FILTER_RETURN_TO_TOWN_PACKET\s+0x3543') 'The authenticated Filter return-to-town packet is missing.'
 $townPacketIndex = $source.IndexOf('else if (*pMsg->m_wpMsgId == FILTER_RETURN_TO_TOWN_PACKET)')

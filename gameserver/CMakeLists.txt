@@ -28,10 +28,10 @@ generate_product_version(VERSION_INFO
         BUNDLE "KMTGuard"
         VERSION_MAJOR 7
         VERSION_MINOR 0
-        VERSION_PATCH 0
+        VERSION_PATCH 4
         VERSION_REVISION 0
         COMPANY_NAME "KMTGuard"
-        COMMENTS "KMTGuard GameServer add-on v7.0.0"
+        COMMENTS "KMTGuard GameServer add-on v7.0.4"
         ORIGINAL_FILENAME "KMTGuard_GameServer.dll"
         INTERNAL_NAME "KMTGuard_GameServer.dll"
         FILE_DESCRIPTION "KMTGuard GameServer add-on"
