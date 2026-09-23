@@ -316,7 +316,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
                         await RecordAlchemyProgressAsync(session, nItemGameID, btNewOptLevel + AdvPlus);
                         QueueAlchemySuccess(session.SessionData.Charid, session.SessionData.Charname,
-                            nRefItemID, btNewOptLevel, AdvPlus, btSlotIndex);
+                            checked((int)nRefItemID), btNewOptLevel, AdvPlus, btSlotIndex);
                     }
                     else
                     {
@@ -340,7 +340,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
                         await RecordAlchemyProgressAsync(session, nItemGameID, btNewOptLevel);
                         QueueAlchemySuccess(session.SessionData.Charid, session.SessionData.Charname,
-                            nRefItemID, btNewOptLevel, 0, btSlotIndex);
+                            checked((int)nRefItemID), btNewOptLevel, 0, btSlotIndex);
                     }
                 }
                

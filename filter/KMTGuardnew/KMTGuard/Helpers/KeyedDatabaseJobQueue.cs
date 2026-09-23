@@ -26,10 +26,14 @@ namespace KMTGuard.Helpers
             var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             lock (Sync)
             {
-                if (!States.TryGetValue(key, out state))
+                if (!States.TryGetValue(key, out var existing))
                 {
                     state = new KeyState();
                     States.Add(key, state);
+                }
+                else
+                {
+                    state = existing;
                 }
 
                 predecessor = state.Tail;

@@ -6,6 +6,7 @@ Release date: 2026-09-23
 
 ### Filter persistence and packet-flow corrections
 
+- Restored successful Filter builds for supported alchemy results without changing packet or database contracts.
 - Kept authoritative alchemy and fellow-pet updates responsive when optional Filter database bookkeeping is slow.
 - Prevented title, icon, and saved reverse-location changes from becoming visible before their required database update succeeds.
 - Preserved authoritative party transition order in background bookkeeping without serializing unrelated characters or increasing database worker counts.
