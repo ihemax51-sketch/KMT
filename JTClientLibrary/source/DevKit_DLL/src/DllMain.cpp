@@ -110,6 +110,7 @@
 #include "CustomInterface/IFKillerAnimationWnd.h"
 #include "CustomInterface/IFDropLogWnd.h"
 #include "CustomInterface/IFOfflineStall.h"
+#include <DiscordRichPresence/DiscordManager.h>
 
 static bool IsSupportedClientHost()
 {
@@ -156,6 +157,20 @@ static DWORD InitializeKMTGuardClient(HINSTANCE module) {
     }
 
     WriteClientStartupDiagnostic("Initialization worker started.");
+
+    // Every installed client entry point is process-lifetime. Pin the module on
+    // the worker (outside loader lock) so a loader cannot FreeLibrary code that
+    // remains referenced by native vtables and CALL sites.
+    HMODULE pinnedModule = NULL;
+    if (!GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+            reinterpret_cast<LPCSTR>(&InitializeKMTGuardClient),
+            &pinnedModule)) {
+        WriteClientStartupDiagnostic("Client module pinning failed; initialization stopped.");
+        MarkClientInitializationFailed();
+        TerminateProcess(GetCurrentProcess(), ERROR_DLL_INIT_FAILED);
+        return 1;
+    }
     if (!IsSupportedClientHost()) {
         WriteClientStartupDiagnostic("Loaded outside the supported game client; initialization skipped.");
         MarkClientInitializationFailed();
@@ -399,6 +414,15 @@ static DWORD WINAPI KMTGuardInitializationThread(LPVOID parameter)
         TerminateProcess(GetCurrentProcess(), ERROR_DLL_INIT_FAILED);
         return 1;
     }
+}
+
+extern "C" __declspec(dllexport) void WINAPI KmtGuardShutdownBackgroundServices()
+{
+    // Optional controlled-shutdown entry for supported loaders. The module is
+    // pinned because native hook sites remain process-lifetime; this only
+    // quiesces owned background services and never attempts unsafe hot-unhook.
+    if (m_dc != NULL)
+        m_dc->Stop();
 }
 
 extern "C" _declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hModule, DWORD fdwReason, LPVOID) {

@@ -270,6 +270,29 @@ void CGInterface::OnTimerIMPL(int timerId) {
             KillTimer(timerId);
             return;
         }
+
+        bool featureUiReady = true;
+        if ((timerId >= HP_TIMER && timerId <= PET_RES_TIMER) ||
+            timerId == START_AUTO_POTION)
+            featureUiReady = macroMenu->AutoPotionSlot->IsRuntimeReady();
+        if (timerId == START_AUTO_SKILL)
+            featureUiReady = macroMenu->AutoSkillSlot->IsUiReady();
+        if (timerId == START_AUTO_HUNT || timerId == START_BACK_TOWN ||
+            timerId == STARTED_INVITE_PLAYER_PARTY)
+            featureUiReady = macroMenu->AutoHuntSlot->IsRuntimeReady();
+        if (timerId == START_PICK_PET_TIMER)
+            featureUiReady = macroMenu->PickupFilterSlot->IsRuntimeReady();
+        if (!featureUiReady)
+        {
+            macroMenu->AutoPotionSlot->Macro_AutoPotion = false;
+            macroMenu->AutoSkillSlot->Macro_AutoSkill = false;
+            macroMenu->AutoHuntSlot->Macro_AutoHunt = false;
+            macroMenu->PickupFilterSlot->Macro_PetFilter = false;
+            macroMenu->AutoScrollSlot->Macro_AutoScroll = false;
+            SuspendMacroAutomationForWorldTransition();
+            KillTimer(timerId);
+            return;
+        }
     }
 
     if (isMacroTimer && !IsMacroWorldReady())
@@ -1360,30 +1383,34 @@ int CGInterface::OnKeyDown(int keycode, int a3, int a4) {
     if(m_Settings->EnableMacro)
     {
         if (keycode == 0x54) {
+            CIFMacroMenu* macroMenu = m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1);
+            CIFMacro* macroWindow = m_IRM.GetResObj<CIFMacro>(MacroID, 1);
+            if (!macroMenu || !macroWindow || !macroMenu->AutoPotionSlot)
+                return reinterpret_cast<int(__thiscall *)(CGInterface *, int, int, int)>(0x00780610)(this, keycode, a3, a4);
 
-            if (this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->IsVisible()) {
-                this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->ShowGWnd(false);
+            if (macroMenu->IsVisible()) {
+                macroMenu->ShowGWnd(false);
                 CGEffSoundBody::get()->PlaySound(L"snd_window_close");
             }
             else {
-                this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->ActivateTabPage(0);
+                macroMenu->ActivateTabPage(0);
 
-                this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoPotionSlot->ActivateTabPage(0);
+                macroMenu->AutoPotionSlot->ActivateTabPage(0);
 
                 //   this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoPotionSlot->LoadInfo();
                // this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->AutoSkillSlot->LoadInfo();
-                this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->UpdateMenuSize();
+                macroMenu->UpdateMenuSize();
                 //this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->ActivateTabPage(0);
-                this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->ShowGWnd(true);
+                macroMenu->ShowGWnd(true);
 
 
 
                 CGEffSoundBody::get()->PlaySound(L"snd_window_open");
                 wnd_pos r;
-                r = this->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->GetPos();
-                this->m_IRM.GetResObj<CIFMacro>(MacroID, 1)->UpdateMenuSize();
-                this->m_IRM.GetResObj<CIFMacro>(MacroID, 1)->ShowGWnd(true);
-                this->m_IRM.GetResObj<CIFMacro>(MacroID, 1)->MoveGWnd(r.x - 313, r.y);
+                r = macroMenu->GetPos();
+                macroWindow->UpdateMenuSize();
+                macroWindow->ShowGWnd(true);
+                macroWindow->MoveGWnd(r.x - 313, r.y);
 
             }
             return true;
@@ -1398,55 +1425,62 @@ int CGInterface::OnKeyDown(int keycode, int a3, int a4) {
 
     if(m_Settings->SecondarySlot)
     {
+        CIFExtQuickSlotCustom* secondarySlot =
+            m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1);
+        if (!secondarySlot)
+            return reinterpret_cast<int(__thiscall *)(CGInterface *, int, int, int)>(0x00780610)(this, keycode, a3, a4);
         if(keycode == 116) /// TODO f5
         {
-            if(this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->ActivePageNo != 1)
+            if(secondarySlot->ActivePageNo != 1)
             {
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->ActivePageNo = 1;
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->hotkey->SetText(L"F5");
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->UpdateSlots();
+                secondarySlot->ActivePageNo = 1;
+                if (secondarySlot->hotkey) secondarySlot->hotkey->SetText(L"F5");
+                secondarySlot->UpdateSlots();
             }
         }
         else if(keycode == 117) /// TODO f6
         {
-            if(this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->ActivePageNo != 2)
+            if(secondarySlot->ActivePageNo != 2)
             {
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->ActivePageNo = 2;
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->hotkey->SetText(L"F6");
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->UpdateSlots();
+                secondarySlot->ActivePageNo = 2;
+                if (secondarySlot->hotkey) secondarySlot->hotkey->SetText(L"F6");
+                secondarySlot->UpdateSlots();
             }
         }
         else if(keycode == 118) /// TODO f7
         {
-            if(this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->ActivePageNo != 3)
+            if(secondarySlot->ActivePageNo != 3)
             {
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->ActivePageNo = 3;
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->hotkey->SetText(L"F7");
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->UpdateSlots();
+                secondarySlot->ActivePageNo = 3;
+                if (secondarySlot->hotkey) secondarySlot->hotkey->SetText(L"F7");
+                secondarySlot->UpdateSlots();
             }
         }
         else if(keycode == 119) /// TODO f8
         {
-            if(this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->ActivePageNo != 4)
+            if(secondarySlot->ActivePageNo != 4)
             {
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->ActivePageNo = 4;
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->hotkey->SetText(L"F8");
-                this->m_IRM.GetResObj<CIFExtQuickSlotCustom>(CustomQuickSlot, 1)->UpdateSlots();
+                secondarySlot->ActivePageNo = 4;
+                if (secondarySlot->hotkey) secondarySlot->hotkey->SetText(L"F8");
+                secondarySlot->UpdateSlots();
             }
         }
     }
     if(m_Settings->EnableNewItemMall)
     {
         if (keycode == 0x79) {
-
-            if (!g_pCGInterface->m_IRM.GetResObj<CIFVItemMall>(NewItemMallId, 1)->IsVisible() && !g_pCGInterface->m_IRM.GetResObj<CIFVAvatarMall>(AvatarMallId, 1)->IsVisible()) {
-                if (!g_pCGInterface->m_IRM.GetResObj<CIFVSelectMall>(SelectMallId, 1)->IsVisible()) {
+            CIFVItemMall* itemMall = m_IRM.GetResObj<CIFVItemMall>(NewItemMallId, 1);
+            CIFVAvatarMall* avatarMall = m_IRM.GetResObj<CIFVAvatarMall>(AvatarMallId, 1);
+            CIFVSelectMall* selectMall = m_IRM.GetResObj<CIFVSelectMall>(SelectMallId, 1);
+            if (!itemMall || !avatarMall || !selectMall)
+                return reinterpret_cast<int(__thiscall *)(CGInterface *, int, int, int)>(0x00780610)(this, keycode, a3, a4);
+            if (!itemMall->IsVisible() && !avatarMall->IsVisible()) {
+                if (!selectMall->IsVisible()) {
                     CGEffSoundBody::get()->PlaySound(L"snd_window_open");
 
-                    g_pCGInterface->m_IRM.GetResObj<CIFVSelectMall>(SelectMallId, 1)->UpdateMenuSize();
-                    g_pCGInterface->m_IRM.GetResObj<CIFVSelectMall>(SelectMallId, 1)->ShowGWnd(true);
-
-                    g_pCGInterface->m_IRM.GetResObj<CIFVSelectMall>(SelectMallId, 1)->BringToFront();
+                    selectMall->UpdateMenuSize();
+                    selectMall->ShowGWnd(true);
+                    selectMall->BringToFront();
 
                 }
 

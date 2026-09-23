@@ -188,6 +188,9 @@ GFX_END_MESSAGE_MAP()
 CIFMacroMenuAutoPotion::CIFMacroMenuAutoPotion(void) {
     BS_DEBUG_LOW(">" __FUNCTION__);
     m_pTabsSecond = 0;
+    memset(MySlots, 0, sizeof(MySlots));
+    CharHP_CheckBox = CharMP_CheckBox = 0;
+    CharHP_Slider = CharMP_Slider = 0;
     Macro_AutoPotion = false;
     CharacterHpTimerRunning = false;
     CharacterMpTimerRunning = false;
@@ -519,10 +522,27 @@ void CIFMacroMenuAutoPotion::OnUpdate() {
 
 }
 
+bool CIFMacroMenuAutoPotion::IsRuntimeReady() const
+{
+    if (!CharHP_CheckBox || !CharMP_CheckBox || !CharHP_Slider || !CharMP_Slider)
+        return false;
+    for (int i = 0; i < 12; ++i)
+        if (!MySlots[i] || !MySlots[i]->m_pMySlot || !MySlots[i]->m_pMySlot->m_pSlot)
+            return false;
+    return true;
+}
+
 void CIFMacroMenuAutoPotion::StartAutomation()
 {
     if (!g_pCGInterface)
         return;
+
+    if (!IsRuntimeReady())
+    {
+        Macro_AutoPotion = false;
+        StopAutomation();
+        return;
+    }
 
     if (!Macro_AutoPotion)
     {
