@@ -7,6 +7,8 @@
 #include "GameServerConsole.h"
 #include "GameServerCrashHandler.h"
 #include <KMTGuardCustom/GameServerRuntimeSafety.h>
+#include <MainProcess.h>
+#include <Objects/GObjPC.h>
 
 typedef int (WINAPI* fnMessageBoxA)(HWND hWnd, LPCSTR lpText, LPCSTR lpCaption, UINT uType);
 typedef int (WINAPI* fnMessageBoxW)(HWND hWnd, LPCWSTR lpText, LPCWSTR lpCaption, UINT uType);
@@ -136,47 +138,23 @@ static void RemoveSystemMessageHooks()
 {
     if (pfnOrigMessageBoxA == NULL || pfnOrigMessageBoxW == NULL)
         return;
-    LONG result = DetourTransactionBegin();
-    if (result == NO_ERROR)
-        result = DetourUpdateThread(GetCurrentThread());
-    if (result == NO_ERROR)
-        result = DetourDetach(&(PVOID&)pfnOrigMessageBoxW, MyMessageBoxW);
-    if (result == NO_ERROR)
-        result = DetourDetach(&(PVOID&)pfnOrigMessageBoxA, MyMessageBoxA);
-    if (result == NO_ERROR)
-        DetourTransactionCommit();
-    else
-        DetourTransactionAbort();
+    GameServerRuntimeSafety::DetachDetour(
+        reinterpret_cast<PVOID*>(&pfnOrigMessageBoxW),
+        reinterpret_cast<PVOID>(MyMessageBoxW), "MessageBoxW detour");
+    GameServerRuntimeSafety::DetachDetour(
+        reinterpret_cast<PVOID*>(&pfnOrigMessageBoxA),
+        reinterpret_cast<PVOID>(MyMessageBoxA), "MessageBoxA detour");
 }
 
 static DWORD InitializeGameServerAddonCore(HMODULE hModule)
 {
         GameServerConsole::Initialize();
-<<<<<<< ours
-        HMODULE hKernel32 = GetModuleHandleA("Kernel32.dll");
-        fnGetModuleHandleExACompat getModuleHandleExA = hKernel32 == NULL
-            ? NULL
-            : reinterpret_cast<fnGetModuleHandleExACompat>(
-                GetProcAddress(hKernel32, "GetModuleHandleExA"));
-        if (getModuleHandleExA == NULL || !getModuleHandleExA(
-                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
-=======
-        if (!GetModuleHandleExA(
-                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
->>>>>>> theirs
-                reinterpret_cast<LPCSTR>(&InitializeGameServerAddonCore),
-                &s_processLifetimeModule))
+        if (s_processLifetimeModule == NULL)
         {
             GameServerConsole::WriteFailure("GameServer add-on process-lifetime pin failed");
             return ERROR_DLL_INIT_FAILED;
         }
         GameServerCrashHandler::Initialize(hModule);
-
-        if (!GameServerRuntimeSafety::ValidateHost())
-        {
-            GameServerConsole::WriteFailure("Unsupported or modified SR_GameServer.exe");
-            return ERROR_BAD_EXE_FORMAT;
-        }
 
         HMODULE hUser32 = GetModuleHandleA("User32.dll");
         if (hUser32 == NULL)
@@ -195,21 +173,16 @@ static DWORD InitializeGameServerAddonCore(HMODULE hModule)
             return ERROR_PROC_NOT_FOUND;
         }
 
-        LONG detourResult = DetourTransactionBegin();
-        if (detourResult == NO_ERROR)
-            detourResult = DetourUpdateThread(GetCurrentThread());
-        if (detourResult == NO_ERROR)
-            detourResult = DetourAttach(&(PVOID&)pfnOrigMessageBoxA, MyMessageBoxA);
-        if (detourResult == NO_ERROR)
-            detourResult = DetourAttach(&(PVOID&)pfnOrigMessageBoxW, MyMessageBoxW);
-        if (detourResult == NO_ERROR)
-            detourResult = DetourTransactionCommit();
-        else
-            DetourTransactionAbort();
-        if (detourResult != NO_ERROR)
+        if (!GameServerRuntimeSafety::AttachDetour(
+                reinterpret_cast<PVOID*>(&pfnOrigMessageBoxA),
+                reinterpret_cast<PVOID>(MyMessageBoxA), "MessageBoxA detour") ||
+            !GameServerRuntimeSafety::AttachDetour(
+                reinterpret_cast<PVOID*>(&pfnOrigMessageBoxW),
+                reinterpret_cast<PVOID>(MyMessageBoxW), "MessageBoxW detour"))
         {
+            RemoveSystemMessageHooks();
             GameServerConsole::WriteFailure("System message hook installation failed");
-            return detourResult;
+            return ERROR_DLL_INIT_FAILED;
         }
 
 
@@ -228,6 +201,7 @@ static DWORD InitializeGameServerAddonCore(HMODULE hModule)
             return ERROR_DLL_INIT_FAILED;
         }
 
+        GameServerRuntimeSafety::MarkInitializationReady();
         GameServerConsole::WriteSuccess("Security, packet guards and telemetry are active");
         SetConsoleTitleA("KMTGuard GameServer | READY");
         return 0;
@@ -247,6 +221,7 @@ static DWORD WINAPI InitializeGameServerAddon(LPVOID parameter)
 
     if (result != ERROR_SUCCESS)
     {
+        GameServerRuntimeSafety::MarkInitializationFailed();
         GameServerConsole::WriteFailure("Fail-closed shutdown: required protection did not initialize");
         TerminateProcess(GetCurrentProcess(), result);
     }
@@ -256,9 +231,46 @@ static DWORD WINAPI InitializeGameServerAddon(LPVOID parameter)
 extern "C" _declspec(dllexport) BOOL WINAPI DllMain(HINSTANCE hModule, DWORD fdwReason, LPVOID lpReserved) {
     if (fdwReason == DLL_PROCESS_ATTACH) {
         DisableThreadLibraryCalls(hModule);
-        HANDLE thread = CreateThread(NULL, 0, InitializeGameServerAddon, hModule, 0, NULL);
-        if (thread == NULL)
+        if (!GameServerRuntimeSafety::ValidateHost())
             return FALSE;
+        if (!GameServerRuntimeSafety::BeginInitialization())
+            return FALSE;
+
+        HMODULE kernel32 = GetModuleHandleA("Kernel32.dll");
+        fnGetModuleHandleExACompat pinModule = kernel32 == NULL ? NULL
+            : reinterpret_cast<fnGetModuleHandleExACompat>(
+                GetProcAddress(kernel32, "GetModuleHandleExA"));
+        if (pinModule == NULL || !pinModule(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                reinterpret_cast<LPCSTR>(&DllMain), &s_processLifetimeModule))
+        {
+            GameServerRuntimeSafety::MarkInitializationFailed();
+            return FALSE;
+        }
+
+        // Publish the custom-packet gate before the loader resumes the host.
+        // Native vSRO traffic continues through the original handler, while
+        // privileged 0x35xx commands fail closed until every prerequisite is
+        // ready. The module is later pinned for process life; hot unload is
+        // intentionally unsupported while hook targets exist.
+        if (!GameServerRuntimeSafety::ReplacePointer(
+                0x00AF5FDC, 0x0050EEE0,
+                static_cast<DWORD>(addr_from_this(&CGObjPC::ReaderPacket)),
+                "bootstrap custom-packet gate"))
+        {
+            GameServerRuntimeSafety::MarkInitializationFailed();
+            return FALSE;
+        }
+        HANDLE thread = CreateThread(NULL, 0, InitializeGameServerAddon, hModule, 0, NULL);
+        if (thread == NULL) {
+            GameServerRuntimeSafety::ReplacePointer(
+                0x00AF5FDC,
+                static_cast<DWORD>(addr_from_this(&CGObjPC::ReaderPacket)),
+                0x0050EEE0,
+                "bootstrap custom-packet gate rollback");
+            GameServerRuntimeSafety::MarkInitializationFailed();
+            return FALSE;
+        }
         CloseHandle(thread);
     }
 

@@ -10,6 +10,7 @@
 #include <SqlConnection/sqlCon.h>
 #include <KMTGuardCustom/DamageMeter.h>
 #include <KMTGuardCustom/GameServerTelemetry.h>
+#include <KMTGuardCustom/LiveDpsMath.h>
 #include <algorithm>
 #include <set>
 
@@ -20,23 +21,25 @@
 
 namespace
 {
+    typedef std::pair<DWORD, unsigned __int64> DpsRecord;
     struct DamageDescending
     {
-        bool operator()(const std::pair<DWORD, DWORD>& left,
-                        const std::pair<DWORD, DWORD>& right) const
+        bool operator()(const DpsRecord& left, const DpsRecord& right) const
         {
             if (left.second != right.second) return left.second > right.second;
             return left.first < right.first;
         }
     };
 
-    struct UniqueDpsSnapshotRecord
+    struct DamageAccumulator
     {
-        DWORD playerGameId;
-        DWORD damage;
+        DWORD previousNativeValue;
+        unsigned __int64 total;
+        DamageAccumulator() : previousNativeValue(0), total(0) {}
     };
 
     static std::set<DWORD> s_uniqueDpsPendingMobs;
+    static std::map<DWORD, std::map<DWORD, DamageAccumulator> > s_uniqueDpsTotals;
     static CRITICAL_SECTION s_uniqueDpsStateLock;
     static DWORD s_uniqueDpsLastBatchTick = 0;
     static unsigned int ReadBoundedEnvironment(const char* name, unsigned int fallback, unsigned int maximum)
@@ -102,65 +105,72 @@ namespace
         }
     }
 
+    static DWORD ToLegacyDamage(unsigned __int64 value)
+    {
+        return LiveDpsMath::ToLegacyWire(value);
+    }
+
+    static bool BuildDpsSnapshot(CGObjMob* pMob, DpsRecord records[UNIQUE_DPS_MAX_RECORDS],
+                                 size_t& recordCount, std::set<DWORD>& recipients)
+    {
+        recordCount = 0;
+        if (pMob == NULL || pMob->MyMap.empty()) return false;
+        UniqueDpsLock guard;
+        std::map<DWORD, DamageAccumulator>& totals = s_uniqueDpsTotals[pMob->GetGameID()];
+        std::map<DWORD, SAggroMapSecondPairItem>::const_iterator it = pMob->MyMap.begin();
+        for (; it != pMob->MyMap.end(); ++it)
+        {
+            const DWORD playerId = it->second.dwPlayerGID;
+            const DWORD current = it->second.dwDamage;
+            DamageAccumulator& accumulator = totals[playerId];
+            accumulator.total = LiveDpsMath::Accumulate(
+                accumulator.total, accumulator.previousNativeValue, current);
+            accumulator.previousNativeValue = current;
+            recipients.insert(playerId);
+            records[recordCount++] = DpsRecord(playerId, accumulator.total);
+            std::sort(records, records + recordCount, DamageDescending());
+            if (recordCount > UNIQUE_DPS_MAX_RECORDS) recordCount = UNIQUE_DPS_MAX_RECORDS;
+        }
+        return recordCount != 0;
+    }
+
     static bool SendLiveUniqueDpsSnapshot(CGObjMob* pMob)
     {
         if (pMob == NULL || pMob->Monsterclass != 3 || g_pCGame == NULL)
             return false;
-
-        if (pMob->MyMap.empty())
-            return false;
-
-        std::pair<DWORD, DWORD> records[UNIQUE_DPS_MAX_RECORDS];
+        DpsRecord records[UNIQUE_DPS_MAX_RECORDS + 1];
         size_t recordCount = 0;
-        CGObjPC* pSender = NULL;
-        std::map<DWORD, SAggroMapSecondPairItem>::iterator itCur = pMob->MyMap.begin();
-        while (itCur != pMob->MyMap.end())
+        std::set<DWORD> recipientIds;
+        if (!BuildDpsSnapshot(pMob, records, recordCount, recipientIds))
+            return false;
+
+        bool sent = false;
+        std::set<DWORD>::const_iterator recipient = recipientIds.begin();
+        for (; recipient != recipientIds.end(); ++recipient)
         {
-            const SAggroMapSecondPairItem& gidDmgPair = itCur->second;
-            IGObj* candidate = g_pCGame->GetObjByGameID(gidDmgPair.dwPlayerGID);
-            if (candidate != NULL && candidate->IsPC())
+            IGObj* object = g_pCGame->GetObjByGameID(*recipient);
+            if (object == NULL || !object->IsPC()) continue;
+            CGObjPC* player = reinterpret_cast<CGObjPC*>(object);
+            CMsg* message = player->AllocMsg(0x5010);
+            if (message == NULL) continue;
+            *message << pMob->GetRefObjID();
+            *message << static_cast<int>(recordCount);
+            for (size_t i = 0; i < recordCount; ++i)
             {
-                if (pSender == NULL)
-                    pSender = reinterpret_cast<CGObjPC*>(candidate);
-
-                const std::pair<DWORD, DWORD> candidateRecord(gidDmgPair.dwPlayerGID, gidDmgPair.dwDamage);
-                size_t insertAt = 0;
-                DamageDescending descending;
-                while (insertAt < recordCount && !descending(candidateRecord, records[insertAt])) ++insertAt;
-                if (insertAt < UNIQUE_DPS_MAX_RECORDS)
-                {
-                    const size_t newCount = recordCount < UNIQUE_DPS_MAX_RECORDS ? recordCount + 1 : recordCount;
-                    for (size_t move = newCount - 1; move > insertAt; --move) records[move] = records[move - 1];
-                    records[insertAt] = candidateRecord; recordCount = newCount;
-                }
+                *message << records[i].first;
+                *message << ToLegacyDamage(records[i].second);
             }
-
-            ++itCur;
+            player->SendMsg(message);
+            sent = true;
         }
-
-        if (recordCount == 0 || pSender == NULL)
-            return false;
-
-        CMsg* pMsg = pSender->AllocMsg(0x5010);
-        if (pMsg == NULL)
-            return false;
-        *pMsg << pMob->GetRefObjID();
-        *pMsg << static_cast<int>(recordCount);
-
-        for (size_t i = 0; i < recordCount; ++i)
-        {
-            *pMsg << records[i].first;
-            *pMsg << records[i].second;
-        }
-
-        pSender->SendMsg(pMsg);
-        return true;
+        return sent;
     }
 
     static void ForgetUniqueDpsMob(DWORD mobGameId)
     {
         UniqueDpsLock guard;
         s_uniqueDpsPendingMobs.erase(mobGameId);
+        s_uniqueDpsTotals.erase(mobGameId);
         UpdatePendingDpsTelemetryLocked();
     }
 }
@@ -316,20 +326,14 @@ unsigned int CGObjMob::HandleMobKilled(IGObj *pKiller)
     SWorldID killedWorld;
     this->GetWorldID(killedWorld);
 
-    std::vector<std::pair<DWORD, DWORD> > damageSnapshot;
+    std::vector<DpsRecord> damageSnapshot;
     if (killedMonsterClass == 3)
     {
-        damageSnapshot.reserve(MyMap.size());
-        std::map<DWORD, SAggroMapSecondPairItem>::const_iterator it = MyMap.begin();
-        for (; it != MyMap.end(); ++it)
-        {
-            damageSnapshot.push_back(std::make_pair(
-                    it->second.dwPlayerGID,
-                    it->second.dwDamage));
-        }
-        std::sort(damageSnapshot.begin(), damageSnapshot.end(), DamageDescending());
-        if (damageSnapshot.size() > UNIQUE_DPS_MAX_RECORDS)
-            damageSnapshot.resize(UNIQUE_DPS_MAX_RECORDS);
+        DpsRecord records[UNIQUE_DPS_MAX_RECORDS + 1];
+        size_t count = 0;
+        std::set<DWORD> recipients;
+        if (BuildDpsSnapshot(this, records, count, recipients))
+            damageSnapshot.assign(records, records + count);
     }
 
     IGObj* resolvedKiller = pKiller;
@@ -367,7 +371,7 @@ unsigned int CGObjMob::HandleMobKilled(IGObj *pKiller)
                 for (size_t i = 0; i < damageSnapshot.size(); ++i)
                 {
                     *pMsg << damageSnapshot[i].first;
-                    *pMsg << damageSnapshot[i].second;
+                    *pMsg << ToLegacyDamage(damageSnapshot[i].second);
                 }
             }
             pPC->SendMsg(pMsg);

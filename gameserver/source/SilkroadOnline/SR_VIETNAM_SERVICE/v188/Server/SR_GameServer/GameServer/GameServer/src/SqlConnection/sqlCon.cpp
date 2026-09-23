@@ -641,36 +641,30 @@ bool CSqlCon::LoadLockedItems(CDbConnection* connection, bool workerStatement)
     return true;
 }
 
-CSqlCon::ItemLockStateResult CSqlCon::SetItemLockState(INT64 itemId, bool locked)
+CSqlCon::ItemLockStateResult CSqlCon::SetItemLockState(
+    CDbConnection* connection, INT64 itemId, bool locked)
 {
-    if (itemId <= 0 || m_connectionstr == NULL)
+    if (itemId <= 0 || connection == NULL)
         return ITEM_LOCK_STATE_FAILED;
-
-    ScopedSqlConnectionLock databaseGuard(s_sqlConnectionLock);
-    ScopedSqlStatement statement(m_connectionstr);
+    ScopedSqlStatement statement(connection);
     if (!statement.Allocate())
         return ITEM_LOCK_STATE_FAILED;
-    if (!SQL_SUCCEEDED(SQLSetStmtAttr(
-            statement.Get(), SQL_ATTR_QUERY_TIMEOUT,
-            reinterpret_cast<SQLPOINTER>(3), 0)))
+    if (!SQL_SUCCEEDED(SQLSetStmtAttr(statement.Get(), SQL_ATTR_QUERY_TIMEOUT,
+                                      reinterpret_cast<SQLPOINTER>(3), 0)))
         return ITEM_LOCK_STATE_FAILED;
-
     char query[256] = { 0 };
     _snprintf(query, sizeof(query) - 1,
               "EXEC [KMTGuard].[dbo].[_KmtSetItemLockState] @ItemID64=%I64d, @Locked=%d",
               itemId, locked ? 1 : 0);
-
     SQLRETURN result = SQLExecDirectA(statement.Get(), (SQLCHAR*)query, SQL_NTS);
     if (!SQL_SUCCEEDED(result) || !SQL_SUCCEEDED(result = SQLFetch(statement.Get())))
         return ITEM_LOCK_STATE_FAILED;
-
     int resultCode = 0;
     SQLLEN length = 0;
     result = SQLGetData(statement.Get(), 1, SQL_C_LONG, &resultCode, sizeof(resultCode), &length);
     if (!SQL_SUCCEEDED(result) || length == SQL_NULL_DATA ||
         (resultCode != ITEM_LOCK_STATE_CHANGED && resultCode != ITEM_LOCK_STATE_ALREADY_SET))
         return ITEM_LOCK_STATE_FAILED;
-
     return static_cast<ItemLockStateResult>(resultCode);
 }
 

@@ -6,9 +6,12 @@
 
 #include "Game.h"
 #include <KMTGuardCustom/GameServerTelemetry.h>
+#include <KMTGuardCustom/GameServerRuntimeSafety.h>
 #include <Objects/GObjMob.h>
 
 void CMainProcess::_OnProcessMessage(MSG_HANDLE) {
+    if (!GameServerRuntimeSafety::IsInitializationReady())
+        return;
     GameServerTelemetry::ScopedGameLoopTimer gameLoopTimer;
     if (g_pCGame == NULL || pMsg == NULL)
         return;
@@ -22,6 +25,7 @@ void CMainProcess::_OnQueueTimer(MSG_HANDLE)
     try
     {
         CGObjMob::FlushLiveDpsBatch();
+        CGObjPC::FlushItemLockCompletions();
     }
     catch (...)
     {

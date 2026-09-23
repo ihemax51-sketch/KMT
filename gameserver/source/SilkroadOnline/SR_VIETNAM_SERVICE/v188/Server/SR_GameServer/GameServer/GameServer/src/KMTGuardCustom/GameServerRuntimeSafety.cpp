@@ -5,9 +5,11 @@
 
 #include <climits>
 #include <cstring>
+#include <TlHelp32.h>
 
 namespace
 {
+    volatile LONG s_initializationState = GameServerRuntimeSafety::INITIALIZATION_UNINITIALIZED;
     const DWORD EXPECTED_IMAGE_BASE = 0x00400000;
     const DWORD EXPECTED_IMAGE_TIMESTAMP = 0x4E3FB0DB;
     const DWORD EXPECTED_IMAGE_SIZE = 0x00971000;
@@ -104,6 +106,71 @@ namespace
         name = name != NULL ? name + 1 : path;
         return _stricmp(name, "SR_GameServer.exe") == 0;
     }
+
+    LONG EnlistProcessThreads(std::vector<HANDLE>& threads)
+    {
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        if (snapshot == INVALID_HANDLE_VALUE)
+            return GetLastError();
+        THREADENTRY32 entry = { 0 };
+        entry.dwSize = sizeof(entry);
+        LONG result = NO_ERROR;
+        if (Thread32First(snapshot, &entry))
+        {
+            do
+            {
+                if (entry.th32OwnerProcessID != GetCurrentProcessId()) continue;
+                HANDLE thread = entry.th32ThreadID == GetCurrentThreadId()
+                    ? GetCurrentThread()
+                    : OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT |
+                                 THREAD_SET_CONTEXT | THREAD_QUERY_INFORMATION,
+                                 FALSE, entry.th32ThreadID);
+                if (thread == NULL) { result = GetLastError(); break; }
+                result = DetourUpdateThread(thread);
+                if (entry.th32ThreadID != GetCurrentThreadId()) threads.push_back(thread);
+                if (result != NO_ERROR) break;
+            } while (Thread32Next(snapshot, &entry));
+        }
+        else result = GetLastError();
+        CloseHandle(snapshot);
+        return result;
+    }
+
+    void CloseThreadHandles(std::vector<HANDLE>& threads)
+    {
+        for (size_t i = 0; i < threads.size(); ++i) CloseHandle(threads[i]);
+        threads.clear();
+    }
+}
+
+bool GameServerRuntimeSafety::BeginInitialization()
+{
+    return InterlockedCompareExchange(
+        &s_initializationState,
+        INITIALIZATION_INITIALIZING,
+        INITIALIZATION_UNINITIALIZED) == INITIALIZATION_UNINITIALIZED;
+}
+
+void GameServerRuntimeSafety::MarkInitializationReady()
+{
+    InterlockedCompareExchange(
+        &s_initializationState, INITIALIZATION_READY, INITIALIZATION_INITIALIZING);
+}
+
+void GameServerRuntimeSafety::MarkInitializationFailed()
+{
+    InterlockedExchange(&s_initializationState, INITIALIZATION_FAILED);
+}
+
+bool GameServerRuntimeSafety::IsInitializationReady()
+{
+    return GetInitializationState() == INITIALIZATION_READY;
+}
+
+GameServerRuntimeSafety::InitializationState GameServerRuntimeSafety::GetInitializationState()
+{
+    return static_cast<InitializationState>(
+        InterlockedCompareExchange(&s_initializationState, 0, 0));
 }
 
 bool GameServerRuntimeSafety::MatchesBytes(DWORD address, const BYTE* expected, size_t length)
@@ -181,14 +248,16 @@ bool GameServerRuntimeSafety::AttachDetour(
         return false;
 
     LONG result = DetourTransactionBegin();
+    std::vector<HANDLE> threads;
     if (result == NO_ERROR)
-        result = DetourUpdateThread(GetCurrentThread());
+        result = EnlistProcessThreads(threads);
     if (result == NO_ERROR)
         result = DetourAttach(originalFunction, replacementFunction);
     if (result == NO_ERROR)
         result = DetourTransactionCommit();
     else
         DetourTransactionAbort();
+    CloseThreadHandles(threads);
 
     if (result != NO_ERROR)
         BS_INFO("[KMTGuard] Failed to install %s (error=%ld)", name != NULL ? name : "detour", result);
@@ -204,14 +273,16 @@ bool GameServerRuntimeSafety::DetachDetour(
         return false;
 
     LONG result = DetourTransactionBegin();
+    std::vector<HANDLE> threads;
     if (result == NO_ERROR)
-        result = DetourUpdateThread(GetCurrentThread());
+        result = EnlistProcessThreads(threads);
     if (result == NO_ERROR)
         result = DetourDetach(originalFunction, replacementFunction);
     if (result == NO_ERROR)
         result = DetourTransactionCommit();
     else
         DetourTransactionAbort();
+    CloseThreadHandles(threads);
 
     if (result != NO_ERROR)
         BS_INFO("[KMTGuard] Failed to remove %s (error=%ld)", name != NULL ? name : "detour", result);
