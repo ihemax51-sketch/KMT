@@ -116,7 +116,7 @@ public static class AutoEventService
         finally
         {
             var source = Interlocked.Exchange(ref _serviceCts, null);
-            Interlocked.Exchange(ref _commandTask, null);
+            _ = Interlocked.Exchange(ref _commandTask, null);
             source?.Dispose();
         }
     }
@@ -1726,6 +1726,8 @@ WHERE RoundID = @RoundID AND CharID = @CharID",
             new { RoundID = roundId, CharID = charId, Summary = Trim(summary, 512) });
     }
 
+    private readonly record struct RewardDeliveryResult(bool Succeeded, string Summary);
+
     private static async Task<string> ApplyRewardsAsync(
         ActiveEventRun run,
         ActiveEventRound round,
@@ -1740,9 +1742,31 @@ WHERE RoundID = @RoundID AND CharID = @CharID",
         {
             try
             {
-                await UpdateRewardOutboxAsync(run.RunID, round.RoundID, session.SessionData.Charid, reward.RewardID, "Processing");
-                summaries.Add(await ApplyRewardAsync(session, reward));
-                await UpdateRewardOutboxAsync(run.RunID, round.RoundID, session.SessionData.Charid, reward.RewardID, "Completed");
+                bool claimed = await TryTransitionRewardOutboxAsync(
+                    run.RunID,
+                    round.RoundID,
+                    session.SessionData.Charid,
+                    reward.RewardID,
+                    "Processing");
+                if (!claimed)
+                {
+                    Log.Warning(
+                        "AutoEvent reward outbox claim failed for {EventCode}, CharID {CharID}, RewardID {RewardID}; delivery skipped",
+                        run.Config.EventCode,
+                        session.SessionData.Charid,
+                        reward.RewardID);
+                    summaries.Add(PlayerLanguage.Get("Reward.DeliveryFailed"));
+                    continue;
+                }
+
+                var delivery = await ApplyRewardAsync(session, reward);
+                summaries.Add(delivery.Summary);
+                await TryTransitionRewardOutboxAsync(
+                    run.RunID,
+                    round.RoundID,
+                    session.SessionData.Charid,
+                    reward.RewardID,
+                    delivery.Succeeded ? "Completed" : "Pending");
             }
             catch (Exception ex)
             {
@@ -1750,7 +1774,9 @@ WHERE RoundID = @RoundID AND CharID = @CharID",
                     run.Config.EventCode,
                     session.SessionData.Charid,
                     reward.RewardID);
-                await UpdateRewardOutboxAsync(run.RunID, round.RoundID, session.SessionData.Charid, reward.RewardID, "Pending");
+                // The reward operation may have committed before an exception
+                // reached this process. Keep a claimed row in Processing so an
+                // operator can reconcile it without risking a duplicate grant.
                 summaries.Add(PlayerLanguage.Get("Reward.DeliveryFailed"));
             }
         }
@@ -1758,28 +1784,49 @@ WHERE RoundID = @RoundID AND CharID = @CharID",
         return string.Join(", ", summaries.Where(x => !string.IsNullOrWhiteSpace(x)));
     }
 
-    private static async Task UpdateRewardOutboxAsync(
+    private static async Task<bool> TryTransitionRewardOutboxAsync(
         long runId,
         long roundId,
         int charId,
         int rewardId,
         string status)
     {
+        string expectedStatus = status switch
+        {
+            "Processing" => "Pending",
+            "Completed" => "Processing",
+            "Pending" => "Processing",
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unsupported reward outbox state.")
+        };
+
         await using var connection = new SqlConnection(Program.Connectionstring);
         await connection.OpenAsync();
-        await connection.ExecuteAsync(new CommandDefinition(@"
+        int affected = await connection.ExecuteAsync(new CommandDefinition(@"
 UPDATE Events.dbo.EventRewardOutbox
 SET Status = @Status,
     Attempts = CASE WHEN @Status = N'Processing' THEN Attempts + 1 ELSE Attempts END,
     CompletedDate = CASE WHEN @Status = N'Completed' THEN SYSUTCDATETIME() ELSE NULL END
-WHERE RunID = @RunID AND RoundID = @RoundID AND CharID = @CharID AND RewardID = @RewardID;",
-            new { RunID = runId, RoundID = roundId, CharID = charId, RewardID = rewardId, Status = status },
+WHERE RunID = @RunID
+  AND RoundID = @RoundID
+  AND CharID = @CharID
+  AND RewardID = @RewardID
+  AND Status = @ExpectedStatus;",
+            new
+            {
+                RunID = runId,
+                RoundID = roundId,
+                CharID = charId,
+                RewardID = rewardId,
+                Status = status,
+                ExpectedStatus = expectedStatus
+            },
             commandTimeout: SqlExecutionPolicy.EventSeconds));
+        return affected == 1;
     }
 
-    private static Task<string> ApplyRewardAsync(ISession session, AutoEventReward reward)
+    private static Task<RewardDeliveryResult> ApplyRewardAsync(ISession session, AutoEventReward reward)
     {
-        return ApplyRewardCoreAsync(
+        return ApplyRewardCoreResultAsync(
             session,
             reward.RewardType,
             reward.Amount,
@@ -1791,6 +1838,27 @@ WHERE RunID = @RunID AND RoundID = @RoundID AND CharID = @CharID AND RewardID = 
     }
 
     internal static async Task<string> ApplyRewardCoreAsync(
+        ISession session,
+        string rewardType,
+        long amount,
+        string? itemCodeName,
+        int? itemId,
+        int itemCount,
+        int plus,
+        string source)
+    {
+        return (await ApplyRewardCoreResultAsync(
+            session,
+            rewardType,
+            amount,
+            itemCodeName,
+            itemId,
+            itemCount,
+            plus,
+            source)).Summary;
+    }
+
+    private static async Task<RewardDeliveryResult> ApplyRewardCoreResultAsync(
         ISession session,
         string rewardType,
         long amount,
@@ -1813,8 +1881,8 @@ WHERE RunID = @RunID AND RoundID = @RoundID AND CharID = @CharID AND RewardID = 
                     source,
                     Math.Clamp(plus, 0, 20));
                 return added
-                    ? PlayerLanguage.Get("Reward.Item", itemCodeName, quantity)
-                    : PlayerLanguage.Get("Reward.ItemFailed", itemCodeName, quantity);
+                    ? new RewardDeliveryResult(true, PlayerLanguage.Get("Reward.Item", itemCodeName, quantity))
+                    : new RewardDeliveryResult(false, PlayerLanguage.Get("Reward.ItemFailed", itemCodeName, quantity));
             }
 
             if (itemId.GetValueOrDefault() > 0)
@@ -1828,11 +1896,11 @@ WHERE RunID = @RunID AND RoundID = @RoundID AND CharID = @CharID AND RewardID = 
                     source,
                     Math.Clamp(plus, 0, 20));
                 return added
-                    ? PlayerLanguage.Get("Reward.ItemId", concreteItemId, quantity)
-                    : PlayerLanguage.Get("Reward.ItemIdFailed", concreteItemId, quantity);
+                    ? new RewardDeliveryResult(true, PlayerLanguage.Get("Reward.ItemId", concreteItemId, quantity))
+                    : new RewardDeliveryResult(false, PlayerLanguage.Get("Reward.ItemIdFailed", concreteItemId, quantity));
             }
 
-            return PlayerLanguage.Get("Reward.InvalidItem");
+            return new RewardDeliveryResult(false, PlayerLanguage.Get("Reward.InvalidItem"));
         }
 
         await using var connection = new SqlConnection(Program.Connectionstring);
@@ -1841,7 +1909,7 @@ WHERE RunID = @RunID AND RoundID = @RoundID AND CharID = @CharID AND RewardID = 
         if (rewardType.Equals("Gold", StringComparison.OrdinalIgnoreCase))
         {
             if (amount <= 0)
-                return PlayerLanguage.Get("Reward.InvalidAmount");
+                return new RewardDeliveryResult(false, PlayerLanguage.Get("Reward.InvalidAmount"));
 
             var shardDb = SqlIdentifier.Quote(_serverSettings.ShardDB);
             var updated = await connection.ExecuteAsync(
@@ -1850,8 +1918,8 @@ WHERE RunID = @RunID AND RoundID = @RoundID AND CharID = @CharID AND RewardID = 
                    WHERE CharID = @CharID",
                 new { Amount = amount, CharID = session.SessionData.Charid });
             return updated == 1
-                ? PlayerLanguage.Get("Reward.Gold", amount)
-                : PlayerLanguage.Get("Reward.DeliveryFailed");
+                ? new RewardDeliveryResult(true, PlayerLanguage.Get("Reward.Gold", amount))
+                : new RewardDeliveryResult(false, PlayerLanguage.Get("Reward.DeliveryFailed"));
         }
 
         var silkColumn = rewardType.ToUpperInvariant() switch
@@ -1865,11 +1933,11 @@ WHERE RunID = @RunID AND RoundID = @RoundID AND CharID = @CharID AND RewardID = 
         if (silkColumn.Length > 0)
         {
             if (amount <= 0 || session.SessionData.JID <= 0)
-                return PlayerLanguage.Get("Reward.InvalidAmount");
+                return new RewardDeliveryResult(false, PlayerLanguage.Get("Reward.InvalidAmount"));
 
             var accountDb = SqlIdentifier.Quote(_serverSettings.AccountDB);
             var effectiveAmount = (int)Math.Min(amount, int.MaxValue);
-            await connection.ExecuteAsync($@"
+            int updated = await connection.ExecuteAsync($@"
 IF NOT EXISTS (SELECT 1 FROM {accountDb}..SK_Silk WITH (UPDLOCK, HOLDLOCK) WHERE JID = @JID)
     INSERT INTO {accountDb}..SK_Silk (JID, silk_own, silk_gift, silk_point)
     VALUES (@JID, 0, 0, 0);
@@ -1885,10 +1953,12 @@ WHERE JID = @JID",
                 "SILKPOINT" => PlayerLanguage.Get("Reward.SilkPoint"),
                 _ => rewardType
             };
-            return PlayerLanguage.Get("Reward.Currency", effectiveAmount, rewardName);
+            return updated > 0
+                ? new RewardDeliveryResult(true, PlayerLanguage.Get("Reward.Currency", effectiveAmount, rewardName))
+                : new RewardDeliveryResult(false, PlayerLanguage.Get("Reward.DeliveryFailed"));
         }
 
-        return PlayerLanguage.Get("Reward.UnsupportedType", rewardType);
+        return new RewardDeliveryResult(false, PlayerLanguage.Get("Reward.UnsupportedType", rewardType));
     }
 
     private static async Task BroadcastNoticeAsync(string message, NoticeType type)

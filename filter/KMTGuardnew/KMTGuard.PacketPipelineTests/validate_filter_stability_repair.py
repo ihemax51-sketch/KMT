@@ -22,6 +22,13 @@ checks = {
     "durable event rewards": (
         ROOT.parent.parent / "database/migrations/20260923_event_reward_outbox.sql",
         ["EventRewardOutbox", "UQ_EventRewardOutbox_Reward"]),
+    "packaged event reward validation": (
+        ROOT.parent.parent / "database/tests/event_reward_outbox_validation.sql",
+        ["EventRewardOutbox", "UQ_EventRewardOutbox_Reward"]),
+    "safe reward outbox transitions": (
+        ROOT / "KMTGuard/Features/AutoEvents/AutoEventService.cs",
+        ["TryTransitionRewardOutboxAsync", 'delivery.Succeeded ? "Completed" : "Pending"',
+         "Keep a claimed row in Processing"]),
     "encrypted quick-login bridge": (
         ROOT / "KMTGuard/Server/QuickLoginAgentAuthBridge.cs",
         ["PasswordCipher", "AesGcm", "ZeroEncryptedPassword"]),
@@ -36,6 +43,16 @@ for name, (path, needles) in checks.items():
     for needle in needles:
         if needle not in source:
             failed.append(f"{name}: missing {needle!r}")
+
+version = (ROOT.parent.parent / "VERSION.txt").read_text(encoding="utf-8-sig").strip()
+if version != "7.0.1":
+    failed.append(f"release version mismatch: expected 7.0.1, found {version!r}")
+
+changelog = (ROOT.parent.parent / "CHANGELOG.md").read_text(encoding="utf-8-sig")
+if "## Update v7.0.1" not in changelog:
+    failed.append("release changelog is missing v7.0.1")
+if any(marker in changelog for marker in ("<<<<<<<", "=======", ">>>>>>>")):
+    failed.append("release changelog still contains merge-conflict markers")
 
 if failed:
     raise SystemExit("\n".join(failed))

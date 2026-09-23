@@ -157,11 +157,11 @@ public static class DatabaseJobQueue
 
         var job = new DatabaseJob(action, null, operation, Environment.TickCount64);
         var generation = Volatile.Read(ref _generation);
+        Interlocked.Increment(ref _queueDepth);
         if (generation.Queue.Writer.TryWrite(job))
-        {
-            Interlocked.Increment(ref _queueDepth);
             return true;
-        }
+
+        Interlocked.Decrement(ref _queueDepth);
 
         Interlocked.Increment(ref _droppedJobs);
 

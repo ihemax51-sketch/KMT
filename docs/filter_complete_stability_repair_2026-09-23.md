@@ -71,15 +71,16 @@ the top-level cleanup path await those stops in dependency order.
 The winner row and one outbox row per configured first-place reward are created
 in one SQL transaction. The `(RunID, RoundID, CharID, RewardID)` unique key is
 the idempotency boundary. Delivery attempts transition `Pending` to
-`Processing` and then `Completed`; known failures return to `Pending`. A
-`Processing` row after an indeterminate process failure is intentionally not
-blindly replayed because doing so could duplicate an externally committed
-reward; it requires reconciliation during staging/operations.
+`Processing` and then `Completed`; confirmed validation or delivery failures
+return to `Pending`. A `Processing` row after an exception or indeterminate
+process failure is intentionally not blindly replayed because doing so could
+duplicate an externally committed reward; it requires reconciliation during
+staging/operations.
 
 Database deployment files:
 
 - `database/migrations/20260923_event_reward_outbox.sql`
-- `database/validation/event_reward_outbox_validation.sql`
+- `database/tests/event_reward_outbox_validation.sql`
 
 ## Runtime control security
 

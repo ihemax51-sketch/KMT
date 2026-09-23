@@ -1,62 +1,3 @@
-<<<<<<< ours
-# KMTGuard Update History
-
-## Update v7.0.0
-
-Release date: 2026-09-21
-
-### GameServer stability hardening - 2026-09-23 (developer build)
-
-- Added server-authorized unique event spawning with location restrictions, replay protection, per-character pacing, and a global event budget.
-- Time-sliced live damage ranking updates so large events remain responsive under load.
-- Isolated telemetry storage and security snapshot database refreshes from live gameplay processing, and hardened authentication and add-on lifetime handling.
-- Added bounded malformed-packet offender diagnostics without changing the existing Filter enforcement model.
-- Requirement: configure authorized event character IDs and allowed event worlds/regions, replace the GameServer add-on, and restart GameServer after successful Windows staging. No SQL update, Filter restart, client replacement, ShardManager replacement, or media update is required.
-
-### Client DLL build correction - 2026-09-23 (developer build)
-
-- Corrected the Client DLL automation source so the pickup and character-entry systems compile together without changing their intended behavior.
-- Verified the complete Client DLL package builds successfully for Windows deployment.
-- Requirement: replace the Client DLL and reopen the game client. No Filter restart, server restart, SQL update, or media update is required.
-
-### GameServer deep audit - 2026-09-23 (developer documentation)
-
-- Completed an independent source audit of GameServer threads, packets, native objects, database access, custom systems, performance, memory ownership, and restart behavior.
-- Documented prioritized stability recommendations and Windows staging coverage without changing GameServer behavior, packets, database objects, or deployment files.
-- Requirement: no GameServer replacement, service restart, Filter restart, SQL update, Client DLL replacement, or media update is required.
-
-### Macro Bot stability hardening - 2026-09-23 (developer build)
-
-- Prevented malformed automation settings, missing custom interface resources, and optional settings failures from crashing or blocking character entry.
-- Improved automation recovery pacing, character-specific settings isolation, safe settings persistence, and pickup performance in crowded areas.
-- Requirement: replace the Client DLL after successful Windows staging and reopen the client. No Filter restart, server restart, SQL update, or media update is required.
-
-### Macro Bot deep audit - 2026-09-23 (developer documentation)
-
-- Completed an independent source audit of Client DLL automation, including potions, skills, hunting, pickup, scrolls, timers, character transitions, settings, performance, packet rates, and third-party bot coexistence.
-- Documented confirmed stability risks and a Windows staging plan without changing Client DLL behavior, packets, media, or server systems.
-- Requirement: no server restart, Filter restart, SQL update, Client DLL replacement, media update, or additional customer action is required.
-
-### Client DLL stability hardening - 2026-09-21 (developer build)
-
-- Hardened Client DLL hook failures, background presence updates, DirectX device transitions, custom packet limits, missing custom windows, long settings paths, startup diagnostics, and production feature defaults.
-- Added deterministic Client DLL lifetime protection and verification for the supplied prebuilt desktop interface component.
-- Additional Windows build and live-client compatibility testing is required before deployment; no replacement binary is included with this source update.
-- Requirement: do not deploy a Client DLL replacement from this update yet. No Filter restart, server restart, SQL update, or media update is required.
-
-### Client DLL deep audit - 2026-09-21 (developer documentation)
-
-- Completed a new independent source audit of the current Client DLL baseline, including startup, hooks, native object lifetimes, DirectX 9, custom interfaces, automation, packets, memory, threads, performance, and loader compatibility.
-- Documented a prioritized Windows staging plan and compatibility-focused recommendations without changing live Client DLL behavior, packets, media, or server systems.
-- Requirement: no server restart, Filter restart, SQL update, Client DLL replacement, media update, or additional customer action is required.
-
-- Consolidated KMTGuard into one complete edition containing the Filter, Admin Desktop, Client DLL, media, GameServer add-on, ShardManager add-on, and all existing feature packages.
-- Removed edition-specific activation, subscription, remote validation, machine/IP binding, player-cap enforcement, and separate package generation requirements.
-- Added one full-build command plus a component build command, both publishing to the single `D:\KMTGuard-build` delivery tree with SHA-256 verification.
-- Requirement: replace and restart the Filter, replace the Client DLL, GameServer add-on, and ShardManager add-on, apply the supplied media, and restart the affected game services. No SQL update is required for this release.
-
-## Update v1.0.0
-=======
 # KMTGuard Update History
 
 ## Update v7.0.1
@@ -68,10 +9,15 @@ Release date: 2026-09-23
 - Prevented shared broadcast data from being mutated across concurrent player sessions and added conservative server-to-client traffic budgets that retain loading, inventory, guild, party, stall, download, and supported bot traffic headroom.
 - Added bounded database-worker health telemetry and packet-processing timeouts so database degradation cannot wait indefinitely in live forwarding paths.
 - Made Filter background-service shutdown deterministic and strengthened local runtime-control requests with bounded input, concurrency limits, expiry, replay protection, and authentication.
-- Added durable, unique Auto Event reward records created atomically with winner claims so failed deliveries remain visible and retryable without creating duplicate claims.
+- Added durable, unique Auto Event reward records created atomically with winner claims so confirmed failures remain retryable while uncertain delivery outcomes are quarantined to prevent duplicate rewards.
 - Removed long-lived plaintext quick-login credentials from the inter-process bridge, added expiry cleanup, and bound one-time credentials to the originating connection identity.
 - Hardened shared session collections used by concurrent packet and lifecycle callbacks.
 - Requirement: apply the supplied v7.0.1 SQL update, replace and restart all Filter role executables together, and update Admin Desktop from the same build. No client DLL, media, GameServer add-on, ShardManager add-on, or opcode change is required.
+
+### Administration delivery
+
+- Improved Admin Desktop single-file packaging so its required native runtime libraries are included in the published executable.
+- Requirement: update Admin Desktop from the same Filter build. No additional game service restart, client replacement, media update, or opcode change is required.
 
 ## Update v7.0.0
 
@@ -122,7 +68,6 @@ Release date: 2026-09-21
 - Requirement: replace and restart the Filter, replace the Client DLL, GameServer add-on, and ShardManager add-on, apply the supplied media, and restart the affected game services. No SQL update is required for this release.
 
 ## Update v1.0.0
->>>>>>> theirs
 
 Release date: 2026-09-14
 
