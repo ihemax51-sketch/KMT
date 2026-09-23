@@ -29,9 +29,11 @@ add_compile_definitions(
         _SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS
 )
 
-# Set target platform ... to ... Windows XP ... oops
-add_definitions(-DWINVER=0x0500)
-add_definitions(-D_WIN32_WINNT=0x0500)
+# GetModuleHandleEx is part of the Windows XP API surface and is required by
+# the client module lifetime guard. Keep the legacy VC80 toolchain while
+# exposing the correct Platform SDK declarations.
+add_definitions(-DWINVER=0x0501)
+add_definitions(-D_WIN32_WINNT=0x0501)
 
 include(Options)
 
