@@ -18,20 +18,29 @@ if(CONFIG_CHATVIEWER_BADWORDFILTER)
     add_definitions(-DCONFIG_CHATVIEWER_BADWORDFILTER)
 endif()
 
-option(CONFIG_IMGUI "Enable ImGui" ON)
+option(CONFIG_IMGUI "Enable ImGui (unsupported without complete D3D reset integration)" OFF)
 if (CONFIG_IMGUI)
     add_definitions(-DCONFIG_IMGUI)
 endif()
 
-option(CONFIG_DEBUG_REDIRECT_PUTDUMP "Redirect the PutDump output to the console" ON)
+option(CONFIG_DEBUG_REDIRECT_PUTDUMP "Redirect the PutDump output to the console" OFF)
 if (CONFIG_DEBUG_REDIRECT_PUTDUMP)
     add_definitions(-DCONFIG_DEBUG_REDIRECT_PUTDUMP)
 endif()
 
-option(CONFIG_DEBUG_CONSOLE "Show the debug console" ON)
+option(CONFIG_DEBUG_CONSOLE "Show the debug console" OFF)
 if (CONFIG_DEBUG_CONSOLE)
     add_definitions(-DCONFIG_DEBUG_CONSOLE)
 endif()
+
+option(KMT_ENABLE_QUICKSTART "Enable developer QuickStart INI support" OFF)
+if (KMT_ENABLE_QUICKSTART)
+    add_definitions(-DKMT_ENABLE_QUICKSTART=1)
+else ()
+    add_definitions(-DKMT_ENABLE_QUICKSTART=0)
+endif ()
+
+message(STATUS "KMT supported configuration: IMGUI=${CONFIG_IMGUI}; QUICKSTART=${KMT_ENABLE_QUICKSTART}; OLD_UNDERBAR=${CONFIG_OLD_UNDERBAR}; TRANSLATION_DEBUG=${CONFIG_TRANSLATIONS_DEBUG}; PUTDUMP=${CONFIG_DEBUG_REDIRECT_PUTDUMP}; DEBUG_CONSOLE=${CONFIG_DEBUG_CONSOLE}")
 
 option(CONFIG_DEBUG_NET_RECEIVE "Print NetProcess debug messages on receive" OFF)
 if (CONFIG_DEBUG_NET_RECEIVE)

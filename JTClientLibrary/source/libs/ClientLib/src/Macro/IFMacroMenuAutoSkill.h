@@ -83,6 +83,7 @@ public:
     bool CheckSkillShieldCondition();
     bool CheckBuffShieldSlot();
     bool CheckSkillWeaponSlots();
+    bool IsUiReady() const;
     bool IsAutoSkillRuntimeReady();
     const SItemData* GetEquippedItemData(byte slot);
     void ResetSelectedTarget();

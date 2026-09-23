@@ -22,11 +22,13 @@ public:
         }
     }
 
-    static void ApplyAll() {
-        Applied() = true;
+    static bool ApplyAll() {
         for (Entry* entry = Head(); entry != 0; entry = entry->next) {
-            Apply(entry);
+            if (!Apply(entry))
+                return false;
         }
+        Applied() = true;
+        return true;
     }
 
 private:
@@ -40,9 +42,9 @@ private:
         return applied;
     }
 
-    static void Apply(Entry* entry) {
+    static bool Apply(Entry* entry) {
         if (entry == 0 || entry->installed) {
-            return;
+            return entry != 0;
         }
 
         unsigned char jmpInst[] = {0xE9, 0x00, 0x00, 0x00, 0x00};
@@ -53,22 +55,28 @@ private:
 
         if (!VirtualProtect((LPVOID) entry->trampoline, sizeof(jmpInst), PAGE_EXECUTE_READWRITE, &dwProtect)) {
             perror("Failed to unprotect memory\n");
-            return;
+            return false;
         }
 
         memcpy((LPVOID) entry->trampoline, jmpInst, sizeof(jmpInst));
+        const bool verified = memcmp((LPVOID)entry->trampoline, jmpInst, sizeof(jmpInst)) == 0;
+        const BOOL flushed = FlushInstructionCache(
+            GetCurrentProcess(), (LPCVOID)entry->trampoline, sizeof(jmpInst));
 
         DWORD otherProtect;
-        if (!VirtualProtect((LPVOID) entry->trampoline, sizeof(jmpInst), dwProtect, &otherProtect)) {
+        const BOOL restored = VirtualProtect(
+            (LPVOID)entry->trampoline, sizeof(jmpInst), dwProtect, &otherProtect);
+        if (!restored) {
             perror("Failed to restore protection on memory");
         }
 
-        entry->installed = true;
+        entry->installed = verified && flushed != FALSE && restored != FALSE;
+        return entry->installed;
     }
 };
 
-inline void ApplyRegisteredMemberHooks() {
-    MemberFunctionHookRegistry::ApplyAll();
+inline bool ApplyRegisteredMemberHooks() {
+    return MemberFunctionHookRegistry::ApplyAll();
 }
 
 template<unsigned int Address>

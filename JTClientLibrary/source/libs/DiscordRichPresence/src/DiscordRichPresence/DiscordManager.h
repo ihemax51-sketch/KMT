@@ -2,6 +2,7 @@
 #include <ctime>
 #include "discord_game_sdk/discord.h"
 #include <Windows.h>
+#include <string>
 
 struct DiscordApp {
     struct IDiscordCore* core;
@@ -28,19 +29,36 @@ enum GAME_STATE : char
 class DiscordManager {
 public:
     DiscordManager();
+    ~DiscordManager();
     void Start(DiscordClientId CLIENT_ID);
     void UpdateState(GAME_STATE State);
     void Stop();
+    void RequestStop();
 
 public:
     DiscordApp m_App;
     DiscordClientId m_CLIENT_ID;
-    bool m_IsStarted;
-    bool m_IsRunning;
-    bool m_IsConnected;
+    volatile LONG m_IsStarted;
+    volatile LONG m_IsRunning;
+    volatile LONG m_IsConnected;
     GAME_STATE m_GameState;
     std::time_t m_InGameTimestamp;
     static DWORD WINAPI DiscordThread();
     void UpdateState();
+    void PublishActivity();
+
+private:
+    struct PresenceSnapshot {
+        GAME_STATE state;
+        std::string details;
+        std::string largeText;
+        std::time_t startedAt;
+    };
+    PresenceSnapshot GetSnapshot();
+    HANDLE m_Thread;
+    DWORD m_ThreadId;
+    HANDLE m_StopEvent;
+    CRITICAL_SECTION m_SnapshotLock;
+    PresenceSnapshot m_Snapshot;
 };
 extern DiscordManager * m_dc;

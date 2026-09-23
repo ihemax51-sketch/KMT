@@ -12,6 +12,8 @@ namespace
     const DWORD kNativeListSentinelCreate = 0x005CED50;
     volatile LONG g_clientInitializationState = 0;
     volatile LONG g_invalidCObjChildTeardownCount = 0;
+    volatile LONG g_startupLogLock = 0;
+    HANDLE g_startupLog = INVALID_HANDLE_VALUE;
 
     void BuildStartupLogPath(char* path, size_t pathSize)
     {
@@ -151,32 +153,36 @@ void WriteClientStartupDiagnostic(const char* message)
     if (message == NULL)
         return;
 
-    char logPath[MAX_PATH] = {0};
-    BuildStartupLogPath(logPath, MAX_PATH);
-    if (logPath[0] == '\0')
-        return;
+    while (InterlockedCompareExchange(&g_startupLogLock, 1, 0) != 0)
+        Sleep(0);
 
-    DWORD creationDisposition = OPEN_ALWAYS;
-    WIN32_FILE_ATTRIBUTE_DATA attributes;
-    ZeroMemory(&attributes, sizeof(attributes));
-    if (GetFileAttributesExA(logPath, GetFileExInfoStandard, &attributes) &&
-        (attributes.nFileSizeHigh != 0 ||
-         attributes.nFileSizeLow >= kStartupLogMaximumBytes)) {
-        creationDisposition = CREATE_ALWAYS;
+    if (g_startupLog == INVALID_HANDLE_VALUE) {
+        char logPath[MAX_PATH] = {0};
+        BuildStartupLogPath(logPath, MAX_PATH);
+        if (logPath[0] == '\0') {
+            InterlockedExchange(&g_startupLogLock, 0);
+            return;
+        }
+
+        DWORD creationDisposition = OPEN_ALWAYS;
+        WIN32_FILE_ATTRIBUTE_DATA attributes;
+        ZeroMemory(&attributes, sizeof(attributes));
+        if (GetFileAttributesExA(logPath, GetFileExInfoStandard, &attributes) &&
+            (attributes.nFileSizeHigh != 0 ||
+             attributes.nFileSizeLow >= kStartupLogMaximumBytes)) {
+            creationDisposition = CREATE_ALWAYS;
+        }
+
+        g_startupLog = CreateFileA(logPath, GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, creationDisposition,
+            FILE_ATTRIBUTE_NORMAL, NULL);
+        if (g_startupLog == INVALID_HANDLE_VALUE) {
+            InterlockedExchange(&g_startupLogLock, 0);
+            return;
+        }
+        SetFilePointer(g_startupLog, 0, NULL, FILE_END);
     }
 
-    HANDLE file = CreateFileA(
-        logPath,
-        GENERIC_WRITE,
-        FILE_SHARE_READ | FILE_SHARE_WRITE,
-        NULL,
-        creationDisposition,
-        FILE_ATTRIBUTE_NORMAL,
-        NULL);
-    if (file == INVALID_HANDLE_VALUE)
-        return;
-
-    SetFilePointer(file, 0, NULL, FILE_END);
 
     SYSTEMTIME now;
     GetLocalTime(&now);
@@ -198,6 +204,7 @@ void WriteClientStartupDiagnostic(const char* message)
     line[sizeof(line) - 1] = '\0';
 
     DWORD written = 0;
-    WriteFile(file, line, static_cast<DWORD>(strlen(line)), &written, NULL);
-    CloseHandle(file);
+    WriteFile(g_startupLog, line, static_cast<DWORD>(strlen(line)), &written, NULL);
+    FlushFileBuffers(g_startupLog);
+    InterlockedExchange(&g_startupLogLock, 0);
 }

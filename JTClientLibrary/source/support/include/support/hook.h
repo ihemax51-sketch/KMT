@@ -21,21 +21,21 @@ int addr_from_this(T funptr) {
 
 
 template<typename T>
-void placeHook(int trampoline_location, T &target_location) {
-    placeHook(trampoline_location, reinterpret_cast<int>(&target_location));
+bool placeHook(int trampoline_location, T &target_location) {
+    return placeHook(trampoline_location, reinterpret_cast<int>(&target_location));
 }
 
-void placeHook(int trampoline_location, int target_location);
+bool placeHook(int trampoline_location, int target_location);
 
-void replaceOffset(int trampoline_location, int target_location);
+bool replaceOffset(int trampoline_location, int target_location);
 
-void replaceAddr(int addr, int value);
+bool replaceAddr(int addr, int value);
 
-void vftableHook(unsigned int vftable_addr, int offset, int target_func);
+bool vftableHook(unsigned int vftable_addr, int offset, int target_func);
 
-void PatchMe(DWORD address, BYTE value);
-void PatchJZtoJMP(void* address);
-void Patch(char *dst, char *src, int size);
+bool PatchMe(DWORD address, BYTE value);
+bool PatchJZtoJMP(void* address);
+bool Patch(char *dst, const char *src, int size);
 
 bool RenderNop(void *addr, int count);
 
@@ -45,21 +45,12 @@ bool CopyBytes(void *dst, const void *src, size_t size);
 
 template<typename T>
 bool Write(uintptr_t offset, const T &value) {
-    LPVOID lpOffset = reinterpret_cast<LPVOID>(offset);
-
-    DWORD dwOldProtect = 0;
-    if (!VirtualProtect(lpOffset, sizeof(T), PAGE_READWRITE, &dwOldProtect))
-        return false;
-
-    *(T *) (offset) = value;
-
-    FlushInstructionCache(GetCurrentProcess(), lpOffset, sizeof(T));
-    return VirtualProtect(lpOffset, sizeof(T), dwOldProtect, &dwOldProtect) != FALSE;
+    return Write(offset, &value, static_cast<int>(sizeof(T)));
 }
 
 bool Write(uintptr_t offset, const void *data, int length);
 
 void RenderJMPInstruction(int address, int jumpto, char *buf);
-void JMPFunction(int address, int jumpto);
+bool JMPFunction(int address, int jumpto);
 void RenderCALLInstruction(int address, int jumpto, char *buf);
-void CALLFunction(int address, int jumpto);
+bool CALLFunction(int address, int jumpto);
