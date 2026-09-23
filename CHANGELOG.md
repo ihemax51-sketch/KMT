@@ -4,6 +4,25 @@
 
 Release date: 2026-09-21
 
+### Macro Bot deep audit - 2026-09-23 (developer documentation)
+
+- Completed an independent source audit of Client DLL automation, including potions, skills, hunting, pickup, scrolls, timers, character transitions, settings, performance, packet rates, and third-party bot coexistence.
+- Documented confirmed stability risks and a Windows staging plan without changing Client DLL behavior, packets, media, or server systems.
+- Requirement: no server restart, Filter restart, SQL update, Client DLL replacement, media update, or additional customer action is required.
+
+### Client DLL stability hardening - 2026-09-21 (developer build)
+
+- Hardened Client DLL hook failures, background presence updates, DirectX device transitions, custom packet limits, missing custom windows, long settings paths, startup diagnostics, and production feature defaults.
+- Added deterministic Client DLL lifetime protection and verification for the supplied prebuilt desktop interface component.
+- Additional Windows build and live-client compatibility testing is required before deployment; no replacement binary is included with this source update.
+- Requirement: do not deploy a Client DLL replacement from this update yet. No Filter restart, server restart, SQL update, or media update is required.
+
+### Client DLL deep audit - 2026-09-21 (developer documentation)
+
+- Completed a new independent source audit of the current Client DLL baseline, including startup, hooks, native object lifetimes, DirectX 9, custom interfaces, automation, packets, memory, threads, performance, and loader compatibility.
+- Documented a prioritized Windows staging plan and compatibility-focused recommendations without changing live Client DLL behavior, packets, media, or server systems.
+- Requirement: no server restart, Filter restart, SQL update, Client DLL replacement, media update, or additional customer action is required.
+
 - Consolidated KMTGuard into one complete edition containing the Filter, Admin Desktop, Client DLL, media, GameServer add-on, ShardManager add-on, and all existing feature packages.
 - Removed edition-specific activation, subscription, remote validation, machine/IP binding, player-cap enforcement, and separate package generation requirements.
 - Added one full-build command plus a component build command, both publishing to the single `D:\KMTGuard-build` delivery tree with SHA-256 verification.

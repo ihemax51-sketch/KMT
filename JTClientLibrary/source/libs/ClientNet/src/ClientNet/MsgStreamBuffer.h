@@ -58,6 +58,18 @@ public:
 
     void FlushRemaining();
 
+    size_t Remaining() const {
+        return m_currentReadBytes <= m_availableBytesForReading
+            ? m_availableBytesForReading - m_currentReadBytes : 0;
+    }
+
+    bool TryReadBytes(void* value, size_t numBytes) {
+        if (numBytes > Remaining())
+            return false;
+        Read(value, numBytes);
+        return m_currentReadBytes <= m_availableBytesForReading;
+    }
+
     //
     // Read
     //

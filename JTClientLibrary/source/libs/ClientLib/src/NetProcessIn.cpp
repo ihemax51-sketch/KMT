@@ -74,6 +74,8 @@ extern bool g_bCurrentStallUsesSilk;
 #include "ICMonster.h"
 #include "ICCos.h"
 #include "IFTargetWindow.h"
+#include <support/SafePath.h>
+#include <ClientNet/SafePacketReader.h>
 #ifdef CONFIG_DEBUG_NET_RECEIVE
 #define DEBUG_PRINT_CALL() printf("%s\n", __FUNCTION__);
 #else
@@ -2139,11 +2141,10 @@ void CNetProcessIn::LoadAttendanceReward(CMsgStreamBuffer & msg){
 }
 
 void CNetProcessIn::WebViewerConfig(CMsgStreamBuffer &msg) {
+    SafePacketReader reader(msg);
     unsigned short count = 0;
-    msg >> count;
-
-    if(count > WEBVIEWER_MAX_BUTTONS)
-        count = WEBVIEWER_MAX_BUTTONS;
+    if (!reader.Read(count) || count > WEBVIEWER_MAX_BUTTONS)
+        return;
 
     std::vector<SWebViewerButtonConfig> buttons;
     for(unsigned short i = 0; i < count; ++i) {
@@ -2152,11 +2153,11 @@ void CNetProcessIn::WebViewerConfig(CMsgStreamBuffer &msg) {
         cfg.FrameWidth = 900;
         cfg.FrameHeight = 620;
 
-        msg >> cfg.Name;
-        msg >> cfg.IconPath;
-        msg >> cfg.Url;
-        msg >> cfg.FrameWidth;
-        msg >> cfg.FrameHeight;
+        if (!reader.ReadString(cfg.Name, 64) ||
+            !reader.ReadString(cfg.IconPath, 260) ||
+            !reader.ReadString(cfg.Url, 2048) ||
+            !reader.Read(cfg.FrameWidth) || !reader.Read(cfg.FrameHeight))
+            return;
 
         if(cfg.FrameWidth < 320) cfg.FrameWidth = 320;
         if(cfg.FrameHeight < 240) cfg.FrameHeight = 240;
@@ -2717,19 +2718,24 @@ void CNetProcessIn::LoadChestV2(CMsgStreamBuffer &msg)
 
 void CNetProcessIn::LoadLuckySpinRewards(CMsgStreamBuffer &msg)
 {
+    SafePacketReader reader(msg);
     int count;
-    msg >> count;
-    m_CustomDataManager->LuckySpinRewards.clear();
+    if (!reader.ReadCount(count, 256))
+        return;
+    std::vector<CustomDataManager::LuckySpinReward> rewards;
 
     for (int i = 0; i < count; ++i) {
         CustomDataManager::LuckySpinReward reward;
-        msg >> reward.ItemID >> reward.Amount;
+        if (!reader.Read(reward.ItemID) || !reader.Read(reward.Amount))
+            return;
         if (reward.ItemID > 0 && reward.Amount > 0) {
-            m_CustomDataManager->LuckySpinRewards.push_back(reward);
+            rewards.push_back(reward);
         }
     }
+    m_CustomDataManager->LuckySpinRewards.swap(rewards);
 
-    CIFLuckySpinWnd* window = g_pCGInterface->GetGuiFromList<CIFLuckySpinWnd>(LUCKY_SPIN_WINDOW_ID);
+    CIFLuckySpinWnd* window = g_pCGInterface
+        ? g_pCGInterface->GetGuiFromList<CIFLuckySpinWnd>(LUCKY_SPIN_WINDOW_ID) : NULL;
     if (window && window->IsVisible()) {
         window->RefreshRewards();
     }
@@ -2772,30 +2778,30 @@ void CNetProcessIn::TradeSellCaptchaRequest(CMsgStreamBuffer &msg)
 
 void CNetProcessIn::LoadSpecialOffers(CMsgStreamBuffer &msg)
 {
+    SafePacketReader reader(msg);
     int count;
-    msg >> count;
-    m_CustomDataManager->SpecialOffers.clear();
+    if (!reader.ReadCount(count, 256))
+        return;
+    std::vector<CustomDataManager::SpecialOfferItem> offers;
 
     for (int i = 0; i < count; ++i) {
         CustomDataManager::SpecialOfferItem offer;
-        msg >> offer.ID;
-        msg >> offer.ItemID;
-        msg >> offer.ItemCount;
-        msg >> offer.MainPrice;
-        msg >> offer.SalePrice;
-        msg >> offer.PaymentType;
-        msg >> offer.PreviewMode;
-        msg >> offer.PreviewRefObjID;
-        msg >> offer.SortOrder;
-        msg >> offer.Title;
-        msg >> offer.PreviewImagePath;
+        if (!reader.Read(offer.ID) || !reader.Read(offer.ItemID) ||
+            !reader.Read(offer.ItemCount) || !reader.Read(offer.MainPrice) ||
+            !reader.Read(offer.SalePrice) || !reader.Read(offer.PaymentType) ||
+            !reader.Read(offer.PreviewMode) || !reader.Read(offer.PreviewRefObjID) ||
+            !reader.Read(offer.SortOrder) || !reader.ReadWString(offer.Title, 128) ||
+            !reader.ReadString(offer.PreviewImagePath, 260))
+            return;
 
         if (offer.ID > 0 && offer.ItemID > 0 && offer.ItemCount > 0 && offer.SalePrice > 0) {
-            m_CustomDataManager->SpecialOffers.push_back(offer);
+            offers.push_back(offer);
         }
     }
+    m_CustomDataManager->SpecialOffers.swap(offers);
 
-    CIFSpecialOffersWnd* window = g_pCGInterface->GetGuiFromList<CIFSpecialOffersWnd>(SPECIAL_OFFERS_WINDOW_ID);
+    CIFSpecialOffersWnd* window = g_pCGInterface
+        ? g_pCGInterface->GetGuiFromList<CIFSpecialOffersWnd>(SPECIAL_OFFERS_WINDOW_ID) : NULL;
     if (window && window->IsVisible()) {
         window->RefreshOffers();
     }
@@ -2828,37 +2834,37 @@ void CNetProcessIn::SpecialOfferPurchaseResult(CMsgStreamBuffer &msg)
 
 void CNetProcessIn::LoadKillerAnimations(CMsgStreamBuffer &msg)
 {
+    SafePacketReader reader(msg);
     int count;
     int activeId;
-    msg >> count;
-    msg >> activeId;
+    if (!reader.ReadCount(count, 256) || !reader.Read(activeId))
+        return;
 
-    m_CustomDataManager->KillerAnimations.clear();
-    m_CustomDataManager->ActiveKillerAnimationId = activeId;
+    std::vector<CustomDataManager::KillerAnimation> animations;
 
     for (int i = 0; i < count; ++i) {
         CustomDataManager::KillerAnimation animation;
         byte owned;
         byte active;
 
-        msg >> animation.ID;
-        msg >> animation.AnimationID;
-        msg >> animation.Price;
-        msg >> animation.PaymentType;
-        msg >> animation.SortOrder;
-        msg >> owned;
-        msg >> active;
-        msg >> animation.DisplayName;
+        if (!reader.Read(animation.ID) || !reader.Read(animation.AnimationID) ||
+            !reader.Read(animation.Price) || !reader.Read(animation.PaymentType) ||
+            !reader.Read(animation.SortOrder) || !reader.Read(owned) ||
+            !reader.Read(active) || !reader.ReadWString(animation.DisplayName, 128))
+            return;
 
         animation.Owned = owned != 0;
         animation.IsActive = active != 0;
 
         if (animation.ID > 0 && KillerAnimationPlayer::IsValidAnimationId(animation.AnimationID)) {
-            m_CustomDataManager->KillerAnimations.push_back(animation);
+            animations.push_back(animation);
         }
     }
+    m_CustomDataManager->KillerAnimations.swap(animations);
+    m_CustomDataManager->ActiveKillerAnimationId = activeId;
 
-    CIFKillerAnimationWnd* window = g_pCGInterface->GetGuiFromList<CIFKillerAnimationWnd>(KILLER_ANIMATION_WINDOW_ID);
+    CIFKillerAnimationWnd* window = g_pCGInterface
+        ? g_pCGInterface->GetGuiFromList<CIFKillerAnimationWnd>(KILLER_ANIMATION_WINDOW_ID) : NULL;
     if (window && window->IsVisible()) {
         window->RefreshAnimations();
     }
@@ -3426,28 +3432,35 @@ void CNetProcessIn::RankCategories(CMsgStreamBuffer &msg)
 }
 void CNetProcessIn::LoadRank(CMsgStreamBuffer &msg)
 {
+    SafePacketReader reader(msg);
     byte count;
-    msg >> count;
+    if (!reader.Read(count) || count > 100)
+        return;
 
     CIFDynamicRanking* ranking =
             g_pCGInterface->m_IRM.GetResObj<CIFDynamicRanking>(DynamicRankingID, 1);
-    ranking->RankList.clear();
+    if (!ranking)
+        return;
+    std::vector<CIFDynamicRanking::RankStruct> ranks;
 
     for (byte i = 0; i < count; ++i)
     {
         std::n_string charName;
         std::n_string guildName;
         int points;
-        msg >> charName >> guildName >> points;
+        if (!reader.ReadString(charName, 64) || !reader.ReadString(guildName, 64) ||
+            !reader.Read(points))
+            return;
 
         CIFDynamicRanking::RankStruct entry = CIFDynamicRanking::RankStruct();
         entry.LineNum = i + 1;
         entry.Charname = TO_NWSTRING(charName).c_str();
         entry.Guild = TO_NWSTRING(guildName).c_str();
         entry.Points = Insert(points);
-        ranking->RankList.push_back(entry);
+        ranks.push_back(entry);
     }
 
+    ranking->RankList.swap(ranks);
     ranking->UpdateRanks();
     msg.FlushRemaining();
 }
@@ -5992,9 +6005,12 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
         if (!m_Player->FirstSpawn) {
             if (g_pMyPlayerObj != NULL) {
 
+                if (!g_pCGInterface)
+                    return;
                 CIFSettings* setting = g_pCGInterface->m_IRM.GetResObj<CIFSettings>(SettingsWndID, 1);
                 char buffersetting[0x200];
-                sprintf(buffersetting, "%s\\Setting\\Client_Extra.txt", theApp.GetWorkingDir());
+                if (!setting || !KmtFormatPath(buffersetting, sizeof(buffersetting), "%s\\Setting\\Client_Extra.txt", theApp.GetWorkingDir()))
+                    return;
 
                 FILE *filesettings = fopen(buffersetting, "r");
                 if (filesettings != NULL) {
@@ -6034,13 +6050,17 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
 
 
                 CIFMacroMenu* CustomMacro = g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1);
+                if (!CustomMacro || !CustomMacro->AutoPotionSlot || !CustomMacro->AutoSkillSlot ||
+                    !CustomMacro->AutoHuntSlot || !CustomMacro->PickupFilterSlot)
+                    return;
                 CustomMacro->AutoPotionSlot->ActivateTabPage(0);
                 CustomMacro->AutoSkillSlot->ActivateTabPage(0);
                 CustomMacro->AutoHuntSlot->ActivateTabPage(0);
                 CustomMacro->PickupFilterSlot->ActivateTabPage(0);
 
                 char buffer3[0x200];
-                sprintf(buffer3, "%s\\Setting\\%ls_Macro.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str());
+                if (!KmtFormatPath(buffer3, sizeof(buffer3), "%s\\Setting\\%ls_Macro.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+                    return;
 
                 int MinLevel = 0;
                 int MaxLevel = 0;
@@ -6209,7 +6229,8 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
 
 
                 char buffer34[0x200];
-                sprintf(buffer34, "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str());
+                if (!KmtFormatPath(buffer34, sizeof(buffer34), "%s\\Setting\\%ls_MacroAutoBuffSettings.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+                    return;
 
 
                 FILE *file34 = fopen(buffer34, "r");
@@ -6233,9 +6254,10 @@ void CNetProcessIn::On3305(CMsgStreamBuffer &msg) {
                     fclose(file34); // Dosyayı kapat
                 }
 
-                CIFMacroMenuPickFilter *  PickupFilterSlot = g_pCGInterface->m_IRM.GetResObj<CIFMacroMenu>(MacroMenuID, 1)->PickupFilterSlot;
+                CIFMacroMenuPickFilter *PickupFilterSlot = CustomMacro->PickupFilterSlot;
                 char buffer35[256];
-                sprintf(buffer35, "%s\\Setting\\%ls_PickupFilter.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str());
+                if (!KmtFormatPath(buffer35, sizeof(buffer35), "%s\\Setting\\%ls_PickupFilter.txt", theApp.GetWorkingDir(), g_pMyPlayerObj->GetCharName().c_str()))
+                    return;
                 FILE *file35 = fopen(buffer35, "r");
                 if (file35 != NULL) {
                     char line[256];
