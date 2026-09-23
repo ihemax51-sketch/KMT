@@ -17,6 +17,7 @@ $packageRoot = Join-Path $stageRoot "package"
 $workRoot = Join-Path $stageRoot "work"
 $versionPath = Join-Path $repoRoot "VERSION.txt"
 $changelogPath = Join-Path $repoRoot "CHANGELOG.md"
+$nativeConfiguration = if ($Configuration -eq "Release") { "RelWithDebInfo" } else { "Debug" }
 
 function Assert-SafePath([string]$Path, [string]$AllowedRoot) {
     $full = [IO.Path]::GetFullPath($Path)
@@ -63,6 +64,92 @@ function Publish-Directory([string]$Source, [string]$Destination) {
     }
     New-Item -ItemType Directory -Path (Split-Path $Destination) -Force | Out-Null
     Copy-Directory $Source $Destination
+}
+
+function Get-RelativePath([string]$Path, [string]$Root) {
+    $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
+    $pathFull = [IO.Path]::GetFullPath($Path)
+    if (-not $pathFull.StartsWith($rootFull, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Path resolves outside the expected root: $pathFull"
+    }
+    return $pathFull.Substring($rootFull.Length).Replace('\', '/')
+}
+
+function Test-MutableFilterPath([string]$RelativePath) {
+    return $RelativePath.Equals("Settings.json", [StringComparison]::OrdinalIgnoreCase) -or
+        $RelativePath.StartsWith("logs/", [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Test-FilesEqual([string]$Left, [string]$Right) {
+    if (-not (Test-Path -LiteralPath $Left -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $Right -PathType Leaf)) {
+        return $false
+    }
+    $leftItem = Get-Item -LiteralPath $Left
+    $rightItem = Get-Item -LiteralPath $Right
+    if ($leftItem.Length -ne $rightItem.Length) { return $false }
+    return (Get-FileHash -LiteralPath $Left -Algorithm SHA256).Hash -eq
+        (Get-FileHash -LiteralPath $Right -Algorithm SHA256).Hash
+}
+
+function Assert-FileReplaceable([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return }
+    $stream = $null
+    try {
+        $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    }
+    catch {
+        throw "Cannot replace '$Path' because it is in use or not writable. Stop the affected KMTGuard process and retry."
+    }
+    finally {
+        if ($null -ne $stream) { $stream.Dispose() }
+    }
+}
+
+function Publish-FilterDirectory([string]$Source, [string]$Destination) {
+    Assert-SafePath $Destination $buildRootFull
+    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+
+    $sourceFiles = @(Get-ChildItem -LiteralPath $Source -File -Recurse)
+    $sourceRelativePaths = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    $filesToCopy = [Collections.Generic.List[object]]::new()
+    foreach ($sourceFile in $sourceFiles) {
+        $relative = Get-RelativePath $sourceFile.FullName $Source
+        [void]$sourceRelativePaths.Add($relative)
+        $target = Join-Path $Destination $relative.Replace('/', '\')
+        if (-not (Test-FilesEqual $sourceFile.FullName $target)) {
+            if (Test-Path -LiteralPath $target -PathType Leaf) {
+                Assert-FileReplaceable $target
+            }
+            $filesToCopy.Add([pscustomobject]@{ Source = $sourceFile.FullName; Destination = $target })
+        }
+    }
+
+    $staleFiles = @(
+        Get-ChildItem -LiteralPath $Destination -File -Recurse | Where-Object {
+            $relative = Get-RelativePath $_.FullName $Destination
+            -not (Test-MutableFilterPath $relative) -and -not $sourceRelativePaths.Contains($relative)
+        }
+    )
+    foreach ($staleFile in $staleFiles) {
+        Assert-FileReplaceable $staleFile.FullName
+    }
+
+    foreach ($entry in $filesToCopy) {
+        New-Item -ItemType Directory -Path (Split-Path $entry.Destination) -Force | Out-Null
+        Copy-Item -LiteralPath $entry.Source -Destination $entry.Destination -Force
+    }
+    foreach ($staleFile in $staleFiles) {
+        Remove-Item -LiteralPath $staleFile.FullName -Force
+    }
+    Get-ChildItem -LiteralPath $Destination -Directory -Recurse |
+        Sort-Object { $_.FullName.Length } -Descending |
+        Where-Object {
+            $relative = Get-RelativePath $_.FullName $Destination
+            -not $relative.Equals("logs", [StringComparison]::OrdinalIgnoreCase) -and
+            $null -eq (Get-ChildItem -LiteralPath $_.FullName -Force | Select-Object -First 1)
+        } |
+        Remove-Item -Force
 }
 
 function Assert-Output([string]$Path) {
@@ -140,7 +227,7 @@ function Build-ClientDll {
     New-Item -ItemType Directory -Path $bridgeOutput -Force | Out-Null
     Invoke-Checked $script:MsBuild @(
         (Join-Path $repoRoot "WebViewerBridge\WebViewerBridge.sln"), "/t:Rebuild",
-        "/p:Configuration=Release", "/p:Platform=Win32", "/p:OutDir=$bridgeOutput\",
+        "/p:Configuration=$Configuration", "/p:Platform=Win32", "/p:OutDir=$bridgeOutput\",
         "/m", "/nologo"
     ) "Build WebViewerBridge"
     $bridgeDll = Join-Path $bridgeOutput "WebViewerBridge.dll"
@@ -160,7 +247,7 @@ function Build-GameServer {
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
     Invoke-LegacyBuild @(
         "if errorlevel 1 exit /b %errorlevel%",
-        "`"$script:CMake`" -S `"$(Join-Path $repoRoot 'gameserver')`" -B `"$serverBuild`" -G Ninja -DCMAKE_MAKE_PROGRAM:FILEPATH=`"$script:Ninja`" -DCMAKE_BUILD_TYPE=RelWithDebInfo -DKMT_GAMESERVER_OUTPUT_DIRECTORY=`"$destination`"",
+        "`"$script:CMake`" -S `"$(Join-Path $repoRoot 'gameserver')`" -B `"$serverBuild`" -G Ninja -DCMAKE_MAKE_PROGRAM:FILEPATH=`"$script:Ninja`" -DCMAKE_BUILD_TYPE=$nativeConfiguration -DKMT_GAMESERVER_OUTPUT_DIRECTORY=`"$destination`"",
         "if errorlevel 1 exit /b %errorlevel%",
         "`"$script:CMake`" --build `"$serverBuild`" --target OutPutGS",
         "exit /b %errorlevel%"
@@ -175,7 +262,7 @@ function Build-ShardManager {
     New-Item -ItemType Directory -Path $destination, $intermediate -Force | Out-Null
     Invoke-Checked $script:MsBuild @(
         (Join-Path $repoRoot "ShardManager\KMTGuard-SM.sln"), "/t:Rebuild",
-        "/p:Configuration=Release", "/p:Platform=x86", "/p:OutDir=$destination\",
+        "/p:Configuration=$Configuration", "/p:Platform=x86", "/p:OutDir=$destination\",
         "/p:IntDir=$intermediate\", "/m", "/nologo"
     ) "Build ShardManager"
     Assert-Output (Join-Path $destination "KMTGuard_ShardManager.dll")
@@ -238,7 +325,7 @@ try {
         & "Build-$item"
     }
 
-    if ($components -contains "Filter") { Publish-Directory (Join-Path $packageRoot "Filter") (Join-Path $buildRootFull "Filter") }
+    if ($components -contains "Filter") { Publish-FilterDirectory (Join-Path $packageRoot "Filter") (Join-Path $buildRootFull "Filter") }
     if ($components -contains "ClientDll") { Publish-Directory (Join-Path $packageRoot "DLL") (Join-Path $buildRootFull "DLL") }
     if ($components -contains "GameServer") { Publish-Directory (Join-Path $packageRoot "ServerAddons\GameServer") (Join-Path $buildRootFull "ServerAddons\GameServer") }
     if ($components -contains "ShardManager") { Publish-Directory (Join-Path $packageRoot "ServerAddons\ShardManager") (Join-Path $buildRootFull "ServerAddons\ShardManager") }
@@ -249,7 +336,12 @@ try {
         ForEach-Object { Join-Path $buildRootFull $_ } |
         Where-Object { Test-Path -LiteralPath $_ }
     $hashLines = Get-ChildItem -LiteralPath $hashTargets -File -Recurse |
-        Where-Object { $_.Name -ne "SHA256SUMS.txt" } |
+        Where-Object {
+            $relative = Get-RelativePath $_.FullName $buildRootFull
+            $_.Name -ne "SHA256SUMS.txt" -and
+                -not $relative.Equals("Filter/Settings.json", [StringComparison]::OrdinalIgnoreCase) -and
+                -not $relative.StartsWith("Filter/logs/", [StringComparison]::OrdinalIgnoreCase)
+        } |
         Sort-Object FullName |
         ForEach-Object {
             $relative = $_.FullName.Substring($buildRootFull.TrimEnd('\').Length + 1).Replace('\', '/')
