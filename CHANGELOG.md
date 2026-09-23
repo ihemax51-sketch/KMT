@@ -4,6 +4,12 @@
 
 Release date: 2026-09-21
 
+### Unified build workflow reliability - 2026-09-22
+
+- Restored complete Client DLL builds with the supported legacy compiler and corrected component packaging so successful builds are no longer rejected by active runtime log files.
+- Filter publishing now preserves live logs and customer settings, validates locked executables before replacing files, and supports consistent Release or Debug configuration selection across all components.
+- Requirement: stop the affected Filter processes before publishing changed Filter executables. No SQL update or media update is required.
+
 ### Client DLL stability hardening - 2026-09-21 (developer build)
 
 - Hardened Client DLL hook failures, background presence updates, DirectX device transitions, custom packet limits, missing custom windows, long settings paths, startup diagnostics, and production feature defaults.
