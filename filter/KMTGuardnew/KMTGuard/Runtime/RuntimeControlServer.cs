@@ -3,6 +3,7 @@ using System.IO.Pipes;
 using System.Text.Json;
 using System.Collections.Concurrent;
 using KMTGuard.Clientless;
+using KMTGuard.Database;
 using KMTGuard.Features.AutoEvents;
 using KMTGuard.Helpers;
 using KMTGuard.Localization;
@@ -93,13 +94,16 @@ public sealed class RuntimeControlServer : IAsyncDisposable
     {
         await using (pipe)
         {
+            using var requestLifetime = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
+            requestLifetime.CancelAfter(TimeSpan.FromSeconds(5));
             try
             {
                 using var reader = new StreamReader(pipe, leaveOpen: true);
                 using var writer = new StreamWriter(pipe, leaveOpen: true) { AutoFlush = true };
-                using var requestTimeout = CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
-                requestTimeout.CancelAfter(TimeSpan.FromSeconds(5));
-                var requestLine = await ReadBoundedLineAsync(reader, MaximumRequestCharacters, requestTimeout.Token);
+                var requestLine = await ReadBoundedLineAsync(
+                    reader,
+                    MaximumRequestCharacters,
+                    requestLifetime.Token);
                 if (string.IsNullOrWhiteSpace(requestLine))
                     return;
 
@@ -109,11 +113,17 @@ public sealed class RuntimeControlServer : IAsyncDisposable
                     !_usedNonces.TryAdd(request.Nonce, request.TimestampUnixSeconds))
                     throw new UnauthorizedAccessException("Runtime control authentication failed.");
                 PruneNonces();
-                var response = await HandleRequestAsync(request);
-                await writer.WriteLineAsync(JsonSerializer.Serialize(response, JsonOptions));
+                var response = await HandleRequestAsync(request, requestLifetime.Token);
+                await writer.WriteLineAsync(
+                    JsonSerializer.Serialize(response, JsonOptions).AsMemory(),
+                    requestLifetime.Token);
             }
             catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
             {
+            }
+            catch (OperationCanceledException) when (requestLifetime.IsCancellationRequested)
+            {
+                Log.Warning("{Role} runtime control request exceeded its five-second lifetime", _role);
             }
             catch (Exception ex)
             {
@@ -166,12 +176,14 @@ public sealed class RuntimeControlServer : IAsyncDisposable
         }
     }
 
-    private async Task<RuntimeResponse> HandleRequestAsync(RuntimeRequest request)
+    private async Task<RuntimeResponse> HandleRequestAsync(
+        RuntimeRequest request,
+        CancellationToken cancellationToken)
     {
         switch (request.Command.Trim().ToLowerInvariant())
         {
             case "runtime.ping":
-                return Success("Ready", await CreateRuntimeSnapshotAsync());
+                return Success("Ready", await CreateRuntimeSnapshotAsync(cancellationToken));
 
             case "runtime.shutdown":
                 _ = Task.Run(async () =>
@@ -326,7 +338,7 @@ public sealed class RuntimeControlServer : IAsyncDisposable
                ?? throw new InvalidDataException("The runtime command payload is invalid.");
     }
 
-    private async Task<RuntimeSnapshot> CreateRuntimeSnapshotAsync()
+    private async Task<RuntimeSnapshot> CreateRuntimeSnapshotAsync(CancellationToken cancellationToken)
     {
         using var process = Process.GetCurrentProcess();
         var databaseLatencyMs = -1d;
@@ -337,9 +349,9 @@ public sealed class RuntimeControlServer : IAsyncDisposable
             var stopwatch = Stopwatch.StartNew();
             await using var connection = new Microsoft.Data.SqlClient.SqlConnection(
                 global::Program.Connectionstring);
-            await connection.OpenAsync();
-            var queue = await Dapper.SqlMapper.QuerySingleAsync<CommandHealthRow>(connection, @"
-SELECT COUNT_BIG(*) AS QueueDepth,
+            await connection.OpenAsync(cancellationToken);
+            var queue = await Dapper.SqlMapper.QuerySingleAsync<CommandHealthRow>(connection, new Dapper.CommandDefinition(@"
+	SELECT COUNT_BIG(*) AS QueueDepth,
        MAX(AgeSeconds) AS OldestCommandAgeSeconds
 FROM
 (
@@ -348,7 +360,9 @@ FROM
     UNION ALL
     SELECT DATEDIFF_BIG(SECOND,CreatedUtc,SYSUTCDATETIME()) AS AgeSeconds
       FROM dbo.Command_PlannedQueue WHERE Status IN (1,2,3)
-) Q;");
+) Q;",
+                commandTimeout: SqlExecutionPolicy.RuntimeHealthSeconds,
+                cancellationToken: cancellationToken));
             stopwatch.Stop();
             databaseLatencyMs = stopwatch.Elapsed.TotalMilliseconds;
             queueDepth = checked((int)queue.QueueDepth);

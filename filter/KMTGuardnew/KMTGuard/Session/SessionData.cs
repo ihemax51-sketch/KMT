@@ -33,6 +33,7 @@ public class SessionData : ISessionData
         CharacterNewReverseSavedLocations = new();
         PetDataDictionary = new();
         CharPetList = new();
+        GatewayCredential = new();
     }
     public IState State { get; }
     public int JID { get; set; }
@@ -147,7 +148,7 @@ public class SessionData : ISessionData
     public int SecondaryPassword { get; set; }
     public byte locale { get; set; }
     public string user_id { get; set; } = string.Empty;
-    public string user_pw { get; set; } = string.Empty;
+    public GatewayCredential GatewayCredential { get; }
     public ushort ServerID { get; set; }
 
 

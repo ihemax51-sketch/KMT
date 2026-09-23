@@ -315,33 +315,8 @@ namespace KMTGuard.Server.AgentPacketHandler
                         }
 
                         await RecordAlchemyProgressAsync(session, nItemGameID, btNewOptLevel + AdvPlus);
-                        await DatabaseJobQueue.RunAsync(() =>
-                        {
-                            try
-                            {
-                                using (var connection = new SqlConnection(Program.Connectionstring))
-                                {
-                                    connection.Open(); // OpenAsync() yerine senkron a�ma daha g�venli
-
-                                    connection.Execute(
-                                        "EXEC [dbo].[Hook_AlchemySuccess] @CharID, @CharName, @RefItemID, @OptLevel, @AdvPlus, @Slot",
-                                        new
-                                        {
-                                            CharID = session.SessionData.Charid,
-                                            CharName = session.SessionData.Charname,
-                                            RefItemID = nRefItemID,
-                                            OptLevel = btNewOptLevel,
-                                            AdvPlus,
-                                            Slot = btSlotIndex
-                                        },
-                                        commandTimeout: 60);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Error($"OnAlchemySuccessEDIT hata: {ex.Message}");
-                            }
-                        });
+                        QueueAlchemySuccess(session.SessionData.Charid, session.SessionData.Charname,
+                            nRefItemID, btNewOptLevel, AdvPlus, btSlotIndex);
                     }
                     else
                     {
@@ -364,32 +339,8 @@ namespace KMTGuard.Server.AgentPacketHandler
                         }
 
                         await RecordAlchemyProgressAsync(session, nItemGameID, btNewOptLevel);
-                        await DatabaseJobQueue.RunAsync(() =>
-                        {
-                            try
-                            {
-                                using (var connection = new SqlConnection(Program.Connectionstring))
-                                {
-                                    connection.Open(); // OpenAsync() yerine senkron a�ma daha g�venli
-
-                                    connection.Execute(
-                                        "EXEC [dbo].[Hook_AlchemySuccess] @CharID, @CharName, @RefItemID, @OptLevel, 0, @Slot",
-                                        new
-                                        {
-                                            CharID = session.SessionData.Charid,
-                                            CharName = session.SessionData.Charname,
-                                            RefItemID = nRefItemID,
-                                            OptLevel = btNewOptLevel,
-                                            Slot = btSlotIndex
-                                        },
-                                        commandTimeout: 60);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Error($"Alchemysuces hata: {ex.Message}");
-                            }
-                        });
+                        QueueAlchemySuccess(session.SessionData.Charid, session.SessionData.Charname,
+                            nRefItemID, btNewOptLevel, 0, btSlotIndex);
                     }
                 }
                
@@ -442,31 +393,8 @@ namespace KMTGuard.Server.AgentPacketHandler
                                     RefManager.g_DelayedJobMgr.CreateJob(job);
                                 }
                                 await RecordAlchemyProgressAsync(session, nRefItemID, btNewOptLevel + AdvPlus);
-                                await DatabaseJobQueue.RunAsync(() =>
-                                {
-                                    try
-                                    {
-                                        using var newConnection = new SqlConnection(Program.Connectionstring);
-                                        newConnection.Open();
-                                        newConnection.Execute(
-                                            "EXEC [dbo].[Hook_AlchemySuccess] @CharID, @CharName, @RefItemID, @OptLevel, @AdvPlus, @Slot",
-                                            new
-                                            {
-                                                CharID = session.SessionData.Charid,
-                                                CharName = session.SessionData.Charname,
-                                                RefItemID = nRefItemID,
-                                                OptLevel = btNewOptLevel,
-                                                AdvPlus,
-                                                Slot = ItemSlot
-                                            },
-                                            commandTimeout: 60);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        // Hata loglama, durumu degistirme
-                                Log.Warning($"[dbo].[Hook_AlchemySuccess] procedure execution failed: {ex.Message}");
-                                    }
-                                });
+                                QueueAlchemySuccess(session.SessionData.Charid, session.SessionData.Charname,
+                                    nRefItemID, btNewOptLevel, AdvPlus, ItemSlot);
                             }
                         }
                     }
@@ -501,31 +429,8 @@ namespace KMTGuard.Server.AgentPacketHandler
                             }
 
                             await RecordAlchemyProgressAsync(session, nRefItemID, btNewOptLevel + AdvPlus);
-                            await DatabaseJobQueue.RunAsync(() =>
-                            {
-                                try
-                                {
-                                    using var newConnection = new SqlConnection(Program.Connectionstring);
-                                    newConnection.Open();
-                                    newConnection.Execute(
-                                        "EXEC [dbo].[Hook_AlchemySuccess] @CharID, @CharName, @RefItemID, @OptLevel, @AdvPlus, @Slot",
-                                        new
-                                        {
-                                            CharID = session.SessionData.Charid,
-                                            CharName = session.SessionData.Charname,
-                                            RefItemID = nRefItemID,
-                                            OptLevel = btNewOptLevel,
-                                            AdvPlus,
-                                            Slot = ItemSlot
-                                        },
-                                        commandTimeout: 60);
-                                }
-                                catch (Exception ex)
-                                {
-                                    // Hata loglama, durumu degistirme
-                                Log.Warning($"[dbo].[Hook_AlchemySuccess] procedure execution failed: {ex.Message}");
-                                }
-                            });
+                            QueueAlchemySuccess(session.SessionData.Charid, session.SessionData.Charname,
+                                nRefItemID, btNewOptLevel, AdvPlus, ItemSlot);
                         }
                     }
                 }
@@ -581,6 +486,34 @@ namespace KMTGuard.Server.AgentPacketHandler
         private static async Task RecordAlchemyProgressAsync(ISession session, long itemReference, int plus)
         {
             await AutoEventService.HandleAlchemySuccessAsync(session, plus);
+        }
+
+        private static void QueueAlchemySuccess(
+            int characterId,
+            string characterName,
+            int referenceItemId,
+            byte optionLevel,
+            byte advancedPlus,
+            byte slot)
+        {
+            DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
+            {
+                await using var connection = new SqlConnection(Program.Connectionstring);
+                await connection.OpenAsync(cancellationToken);
+                await connection.ExecuteAsync(new CommandDefinition(
+                    "EXEC [dbo].[Hook_AlchemySuccess] @CharID, @CharName, @RefItemID, @OptLevel, @AdvPlus, @Slot",
+                    new
+                    {
+                        CharID = characterId,
+                        CharName = characterName,
+                        RefItemID = referenceItemId,
+                        OptLevel = optionLevel,
+                        AdvPlus = advancedPlus,
+                        Slot = slot
+                    },
+                    commandTimeout: SqlExecutionPolicy.BackgroundSeconds,
+                    cancellationToken: cancellationToken));
+            }, operation: "alchemy success bookkeeping");
         }
     }
 }

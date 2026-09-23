@@ -1,4 +1,5 @@
 ﻿using Dapper;
+using KMTGuard.Database;
 using KMTGuard.Database.Models;
 using KMTGuard.Helpers;
 using KMTGuard.PacketHandlerManager;
@@ -137,6 +138,9 @@ namespace KMTGuard.Server.AgentPacketHandler
         }
         private async Task<PacketResult> HandleCosDataAck(Packet packet, ISession session, object obj) // UNK
         {
+            // The GameServer packet is authoritative. Forward an independent copy
+            // before optional fellow persistence so SQL latency cannot delay 0x30C8.
+            await session.SendToClient(new Packet(packet));
             try
             {
                 uint nGameID = packet.ReadUInt32();
@@ -181,7 +185,7 @@ namespace KMTGuard.Server.AgentPacketHandler
 
 
                     if (nOwnerGID != session.SessionData.UniqueCharId)
-                        return new PacketResult();
+                        return new PacketResult(PacketResultType.Block);
 
 
                     session.SessionData.IsFellowSummoned = true;
@@ -327,17 +331,15 @@ namespace KMTGuard.Server.AgentPacketHandler
                                         stAckMsg.WriteUInt8(str.Enable_Skill_5);
                                         await session.SendToClient(stAckMsg);
 
-                                        await DatabaseJobQueue.RunAsync(() =>
+                                        DatabaseJobQueue.TryQueueBackground(async cancellationToken =>
                                         {
-                                            try
-                                            {
-                                                using var newConnection = new SqlConnection(Program.Connectionstring);
-                                                newConnection.Open();
-                                                var sqlCommand = new SqlCommand(
+                                                await using var newConnection = new SqlConnection(Program.Connectionstring);
+                                                await newConnection.OpenAsync(cancellationToken);
+                                                await using var sqlCommand = new SqlCommand(
                                                     "EXEC [dbo].[Player_SaveFellow] @ID64, @EnableSkill1, @EnableSkill2, @EnableSkill3, @EnableSkill4, @EnableSkill5",
                                                     newConnection)
                                                 {
-                                                    CommandTimeout = 60
+                                                    CommandTimeout = SqlExecutionPolicy.BackgroundSeconds
                                                 };
                                                 sqlCommand.Parameters.AddWithValue("@ID64", str.ID64);
                                                 sqlCommand.Parameters.AddWithValue("@EnableSkill1", str.Enable_Skill_1);
@@ -346,14 +348,8 @@ namespace KMTGuard.Server.AgentPacketHandler
                                                 sqlCommand.Parameters.AddWithValue("@EnableSkill4", str.Enable_Skill_4);
                                                 sqlCommand.Parameters.AddWithValue("@EnableSkill5", str.Enable_Skill_5);
 
-                                                sqlCommand.ExecuteNonQuery();
-                                            }
-                                            catch (Exception ex)
-                                            {
-                                                // Hata loglama, durumu değiştirme
-                                        Log.Warning($"[dbo].[Player_SaveFellow] Prosedür çalıştırılırken hata: {ex.Message}");
-                                            }
-                                        });
+                                                await sqlCommand.ExecuteNonQueryAsync(cancellationToken);
+                                        }, operation: "fellow skill persistence bookkeeping");
                                     }
                                 }
                             }
@@ -365,7 +361,7 @@ namespace KMTGuard.Server.AgentPacketHandler
             {
                 Log.Error($"{EX.Message.ToString()}, HandleCosDataAck", ConsoleColor.Red);
             }
-            return new PacketResult();
+            return new PacketResult(PacketResultType.Block);
         }
 
         private Task<PacketResult> CLIENT_AGENT_COS_UPDATE(Packet packet, ISession session, object obj)
