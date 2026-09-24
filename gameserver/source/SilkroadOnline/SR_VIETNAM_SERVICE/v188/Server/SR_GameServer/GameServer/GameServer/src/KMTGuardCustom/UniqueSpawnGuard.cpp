@@ -84,8 +84,10 @@ bool UniqueSpawnGuard::AuthorizeAndConsume(CGObjPC* player, BYTE uniqueType,
         s_allowedRegions.find(static_cast<WORD>(position.wRegionID)) == s_allowedRegions.end())
         { GameServerTelemetry::RecordUniqueSpawnRejected(3); return false; }
     const DWORD token = HashToken(player, uniqueType, replayToken, replayTokenLength);
+    const DWORD effectiveReplayWindow = s_replayWindowMs < s_cooldownMs
+        ? s_replayWindowMs : s_cooldownMs;
     std::map<DWORD,DWORD>::iterator replay = s_recentTokens.begin();
-    while (replay != s_recentTokens.end()) { if (now - replay->second > s_replayWindowMs) s_recentTokens.erase(replay++); else ++replay; }
+    while (replay != s_recentTokens.end()) { if (now - replay->second >= effectiveReplayWindow) s_recentTokens.erase(replay++); else ++replay; }
     if (s_recentTokens.find(token) != s_recentTokens.end()) { GameServerTelemetry::RecordUniqueSpawnRejected(4); return false; }
     const DWORD id = player->GetGameID();
     if (s_characterCooldowns.find(id) != s_characterCooldowns.end() && now - s_characterCooldowns[id] < s_cooldownMs)

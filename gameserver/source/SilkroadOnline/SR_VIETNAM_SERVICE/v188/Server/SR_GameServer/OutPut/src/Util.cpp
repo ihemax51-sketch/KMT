@@ -19,6 +19,7 @@
 #include <KMTGuardCustom/GObjEvents.h>
 #include <KMTGuardCustom/InternalPacketAuth.h>
 #include <KMTGuardCustom/ItemRegionTravelGuard.h>
+#include <KMTGuardCustom/ItemLockPersistence.h>
 #include <KMTGuardCustom/PartyMonsterControl.h>
 #include <KMTGuardCustom/TradeGoldControl.h>
 
@@ -57,6 +58,8 @@ namespace
         for (; installedCount < hookCount; ++installedCount)
         {
             const PointerHook& hook = kCorePointerHooks[installedCount];
+            if (*reinterpret_cast<const DWORD*>(hook.address) == hook.replacement)
+                continue;
             if (!GameServerRuntimeSafety::ReplacePointer(
                     hook.address,
                     hook.expected,
@@ -99,6 +102,7 @@ namespace
     {
         RemoveCorePointerHooks();
         CItemRegionTravelGuard::Shutdown();
+        ItemLockPersistence::Shutdown();
         CGObjEvents::Shutdown();
         CGObjSiegeStruct::Shutdown();
         CRegionAttackRestrictionsMgr::Shutdown();
@@ -165,6 +169,7 @@ bool Init()
         }
 
         if (!CLogCustoms::Setup(KMTGUARD_VERSION_STRING) ||
+            !ItemLockPersistence::Initialize() ||
             !CDamageMeter::Initialize() ||
             !CRegionAttackRestrictionsMgr::Initialize() ||
             !CGObjSiegeStruct::Initialize() ||

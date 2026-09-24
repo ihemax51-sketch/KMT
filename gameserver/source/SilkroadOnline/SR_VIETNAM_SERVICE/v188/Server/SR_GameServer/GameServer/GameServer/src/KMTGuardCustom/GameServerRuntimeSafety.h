@@ -38,6 +38,20 @@ private:
 
 namespace GameServerRuntimeSafety
 {
+    enum InitializationState
+    {
+        INITIALIZATION_UNINITIALIZED = 0,
+        INITIALIZATION_INITIALIZING = 1,
+        INITIALIZATION_READY = 2,
+        INITIALIZATION_FAILED = 3,
+        INITIALIZATION_STOPPING = 4
+    };
+
+    bool BeginInitialization();
+    void MarkInitializationReady();
+    void MarkInitializationFailed();
+    bool IsInitializationReady();
+    InitializationState GetInitializationState();
     bool ValidateHost();
     bool MatchesBytes(DWORD address, const BYTE* expected, size_t length);
     bool AttachDetour(PVOID* originalFunction, PVOID replacementFunction, const char* name);

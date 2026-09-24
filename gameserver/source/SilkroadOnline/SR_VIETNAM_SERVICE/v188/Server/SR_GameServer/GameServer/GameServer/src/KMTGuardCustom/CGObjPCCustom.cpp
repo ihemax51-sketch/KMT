@@ -9,11 +9,11 @@
 #include "SqlConnection/sqlCon.h"
 #include <ReferenceData/ReferenceDataMgr.h>
 #include <map>
-#include <set>
 #include <float.h>
 #include <KMTGuardCustom/GameServerTelemetry.h>
 #include <KMTGuardCustom/InternalPacketAuth.h>
 #include <KMTGuardCustom/ItemRegionTravelGuard.h>
+#include <KMTGuardCustom/ItemLockPersistence.h>
 #include <KMTGuardCustom/UniqueSpawnGuard.h>
 
 
@@ -148,7 +148,6 @@ namespace {
     };
 
     std::map<int, FilterSessionKeyEntry> g_FilterSessionKeys;
-    std::set<INT64> g_PendingItemLockOperations;
     struct SilkStallBuyPreparation
     {
         __int64 transactionId;
@@ -190,32 +189,6 @@ namespace {
         }
         return true;
     }
-
-    class ScopedItemLockOperation
-    {
-    public:
-        explicit ScopedItemLockOperation(INT64 itemId)
-            : m_itemId(itemId), m_acquired(false)
-        {
-            ScopedCriticalSection guard(g_FilterSessionKeysLock);
-            m_acquired = g_PendingItemLockOperations.insert(itemId).second;
-        }
-
-        ~ScopedItemLockOperation()
-        {
-            if (!m_acquired) return;
-            ScopedCriticalSection guard(g_FilterSessionKeysLock);
-            g_PendingItemLockOperations.erase(m_itemId);
-        }
-
-        bool Acquired() const { return m_acquired; }
-
-    private:
-        INT64 m_itemId;
-        bool m_acquired;
-        ScopedItemLockOperation(const ScopedItemLockOperation&);
-        ScopedItemLockOperation& operator=(const ScopedItemLockOperation&);
-    };
 
     void SetFilterSessionKey(CGObjPC* player, const std::string& key) {
         if (player == NULL || player->GetDBID() <= 0)
@@ -392,6 +365,15 @@ namespace {
                item->InstanceItem->pCRefObjItem != NULL;
     }
 
+    bool WasOneItemConsumed(CGObjPC* player, int slot, INT64 itemId, int beforeAmount)
+    {
+        CGItem* current = GetInventoryItemSafe(player, slot);
+        if (beforeAmount == 1)
+            return current == NULL || current->InstanceItem == NULL || current->ID64 != itemId;
+        return IsUsableItem(current) && current->ID64 == itemId &&
+               current->InstanceItem->Data == beforeAmount - 1;
+    }
+
     bool TryGetMessagePayload(CMsg* message, const char*& payload, int& length)
     {
         payload = NULL;
@@ -457,6 +439,15 @@ void CGObjPC::ReaderPacket(CMsg* pMsg) {
         GameServerTelemetry::RecordMalformedPacketForSession(
             this != NULL ? this->GetGameID() : 0,
             pMsg != NULL && pMsg->m_wpMsgId != NULL ? *pMsg->m_wpMsgId : 0);
+        return;
+    }
+
+    if (!GameServerRuntimeSafety::IsInitializationReady())
+    {
+        const WORD opcode = *pMsg->m_wpMsgId;
+        if (opcode >= 0x3500 && opcode <= 0x35FF)
+            return;
+        reinterpret_cast<void(__thiscall*)(CGObjPC*, CMsg*)>(0x0050EEE0)(this, pMsg);
         return;
     }
 
@@ -1462,192 +1453,137 @@ void CGObjPC::HandleCustomScrollUsage(CMsg * pMsg)
 }
 void CGObjPC::HandleItemLockRequest(CMsg* pMsg)
 {
-    int itemId;
-    *pMsg >> itemId;
+    int itemId = 0, itemSlotId = 0, lockedItemSlot = 0;
+    unsigned short itemTypeId = 0;
+    *pMsg >> itemId >> itemSlotId >> itemTypeId >> lockedItemSlot;
 
-    int itemSlotId;
-    *pMsg >> itemSlotId;
-
-    unsigned short itemTypeId;
-    *pMsg >> itemTypeId;
-
-    int LockedItemSlot;
-    *pMsg >> LockedItemSlot;
-
-
-    CGItem* lockedItem = GetInventoryItemSafe(this, LockedItemSlot);
+    CGItem* lockedItem = GetInventoryItemSafe(this, lockedItemSlot);
     CGItem* lockScroll = GetInventoryItemSafe(this, itemSlotId);
-    if (IsUsableItem(lockedItem))
+    if (!IsUsableItem(lockedItem) || !IsUsableItem(lockScroll) ||
+        CSqlCon::IsItemLocked(lockedItem->ID64) ||
+        lockScroll->InstanceItem->RefItemID != itemId ||
+        lockScroll->InstanceItem->pCRefObjItem->TID.m_type_id_value != 0xCEED)
     {
-        INT64 ID64 = lockedItem->ID64;
-        ScopedItemLockOperation operation(ID64);
-        if (!operation.Acquired())
-        {
-            SendItemLockFailure(this, 1, 2, static_cast<BYTE>(LockedItemSlot));
-            return;
-        }
-        if (!CSqlCon::IsItemLocked(ID64))
-        {
-            if (IsUsableItem(lockScroll))
-            {
-                if (lockScroll->InstanceItem->RefItemID == itemId && lockScroll->InstanceItem->pCRefObjItem->TID.m_type_id_value == 0xCEED)
-                {
-                    CMsg* newpMsg = this->AllocMsg(0x5030);
-                    CMsg* pMsg2 = this->AllocMsg(0x305C);
-                    CMsg* pShardMsgFirst = NEWMSG(SEND_SHARD_TO_LOCK_INFO, false);
-                    if (newpMsg == NULL || pMsg2 == NULL || pShardMsgFirst == NULL)
-                    {
-                        CNetHelper::FreeMsg(newpMsg);
-                        CNetHelper::FreeMsg(pMsg2);
-                        CNetHelper::FreeMsg(pShardMsgFirst);
-                        SendItemLockFailure(this, 1, 2, static_cast<BYTE>(LockedItemSlot));
-                        return;
-                    }
-
-                    const CSqlCon::ItemLockStateResult stateResult =
-                        CSqlCon::SetItemLockState(ID64, true);
-                    if (stateResult != CSqlCon::ITEM_LOCK_STATE_CHANGED)
-                    {
-                        CNetHelper::FreeMsg(newpMsg);
-                        CNetHelper::FreeMsg(pMsg2);
-                        CNetHelper::FreeMsg(pShardMsgFirst);
-                        SendItemLockFailure(this, 1,
-                            stateResult == CSqlCon::ITEM_LOCK_STATE_FAILED ? 1 : 2,
-                            static_cast<BYTE>(LockedItemSlot));
-                        return;
-                    }
-
-                    lockedItem = GetInventoryItemSafe(this, LockedItemSlot);
-                    lockScroll = GetInventoryItemSafe(this, itemSlotId);
-                    if (!IsUsableItem(lockedItem) || lockedItem->ID64 != ID64 ||
-                        !IsUsableItem(lockScroll) || lockScroll->InstanceItem->RefItemID != itemId)
-                    {
-                        CSqlCon::SetItemLockState(ID64, false);
-                        CNetHelper::FreeMsg(newpMsg);
-                        CNetHelper::FreeMsg(pMsg2);
-                        CNetHelper::FreeMsg(pShardMsgFirst);
-                        SendItemLockFailure(this, 1, 2, static_cast<BYTE>(LockedItemSlot));
-                        return;
-                    }
-
-                    CSqlCon::AddLockedItem(ID64);
-                    this->SetLiveDeleteItem(itemSlotId, 1);
-
-                    *newpMsg << LockedItemSlot << ID64;
-                    *pMsg2 << unsigned int(this->GetGameID()); //flag opt lvl
-                    *pMsg2 << unsigned int(3769);
-                    *pShardMsgFirst << ID64;
-                    CNetHelper::SendMsgToSM(pShardMsgFirst);
-                    this->SendMsg(newpMsg);
-                    this->SendMsg(pMsg2);
-                }
-            }
-        }
-        else
-        {
-            CMsg* pck = this->AllocMsg(0x5015);
-            if (pck == NULL)
-                return;
-            *pck << byte(TYPE_OF_ITEM_LOCKED);
-            this->SendMsg(pck);
-            return;
-        }
+        SendItemLockFailure(this, 1, 2, static_cast<BYTE>(lockedItemSlot));
+        return;
     }
 
+    if (!ItemLockPersistence::Enqueue(
+            GetGameID(), GetDBID(), lockedItem->ID64, lockScroll->ID64,
+            lockedItemSlot, itemSlotId, true))
+        SendItemLockFailure(this, 1, 2, static_cast<BYTE>(lockedItemSlot));
 }
+
 void CGObjPC::HandleItemUnlockRequest(CMsg* pMsg)
 {
-    int itemId;
-    *pMsg >> itemId;
+    int itemId = 0, itemSlotId = 0, lockedItemSlot = 0;
+    unsigned short itemTypeId = 0;
+    *pMsg >> itemId >> itemSlotId >> itemTypeId >> lockedItemSlot;
 
-    int itemSlotId;
-    *pMsg >> itemSlotId;
-
-    unsigned short itemTypeId;
-    *pMsg >> itemTypeId;
-
-    int LockedItemSlot;
-    *pMsg >> LockedItemSlot;
-
-
-    CGItem* lockedItem = GetInventoryItemSafe(this, LockedItemSlot);
+    CGItem* lockedItem = GetInventoryItemSafe(this, lockedItemSlot);
     CGItem* unlockScroll = GetInventoryItemSafe(this, itemSlotId);
-    if (IsUsableItem(lockedItem))
+    if (!IsUsableItem(lockedItem) || !IsUsableItem(unlockScroll) ||
+        !CSqlCon::IsItemLocked(lockedItem->ID64) ||
+        unlockScroll->InstanceItem->RefItemID != itemId ||
+        unlockScroll->InstanceItem->pCRefObjItem->TID.m_type_id_value != 0xD6ED)
     {
-        INT64 ID64 = lockedItem->ID64;
-        ScopedItemLockOperation operation(ID64);
-        if (!operation.Acquired())
+        SendItemLockFailure(this, 2, 2, static_cast<BYTE>(lockedItemSlot));
+        return;
+    }
+
+    if (!ItemLockPersistence::Enqueue(
+            GetGameID(), GetDBID(), lockedItem->ID64, unlockScroll->ID64,
+            lockedItemSlot, itemSlotId, false))
+        SendItemLockFailure(this, 2, 2, static_cast<BYTE>(lockedItemSlot));
+}
+
+void CGObjPC::FlushItemLockCompletions()
+{
+    ItemLockPersistence::Completion completion;
+    unsigned int processed = 0;
+    while (processed < 32 && ItemLockPersistence::TryTakeCompletion(completion))
+    {
+        ++processed;
+        if (completion.succeeded)
         {
-            SendItemLockFailure(this, 2, 2, static_cast<BYTE>(LockedItemSlot));
-            return;
-        }
-        if (CSqlCon::IsItemLocked(ID64))
-        {
-            if (IsUsableItem(unlockScroll))
+            CMsg* shard = NEWMSG(
+                completion.lockItem ? SEND_SHARD_TO_LOCK_INFO : SEND_SHARD_TO_UNLOCK_INFO,
+                false);
+            if (shard != NULL)
             {
-                if (unlockScroll->InstanceItem->RefItemID == itemId && unlockScroll->InstanceItem->pCRefObjItem->TID.m_type_id_value == 0xD6ED)
-                {
-                    CMsg* newpMsg = this->AllocMsg(0x5031);
-                    CMsg* pMsg2 = this->AllocMsg(0x305C);
-                    CMsg* pShardMsgFirst = NEWMSG(SEND_SHARD_TO_UNLOCK_INFO, false);
-                    if (newpMsg == NULL || pMsg2 == NULL || pShardMsgFirst == NULL)
-                    {
-                        CNetHelper::FreeMsg(newpMsg);
-                        CNetHelper::FreeMsg(pMsg2);
-                        CNetHelper::FreeMsg(pShardMsgFirst);
-                        SendItemLockFailure(this, 2, 2, static_cast<BYTE>(LockedItemSlot));
-                        return;
-                    }
-
-                    const CSqlCon::ItemLockStateResult stateResult =
-                        CSqlCon::SetItemLockState(ID64, false);
-                    if (stateResult != CSqlCon::ITEM_LOCK_STATE_CHANGED)
-                    {
-                        CNetHelper::FreeMsg(newpMsg);
-                        CNetHelper::FreeMsg(pMsg2);
-                        CNetHelper::FreeMsg(pShardMsgFirst);
-                        SendItemLockFailure(this, 2,
-                            stateResult == CSqlCon::ITEM_LOCK_STATE_FAILED ? 1 : 2,
-                            static_cast<BYTE>(LockedItemSlot));
-                        return;
-                    }
-
-                    lockedItem = GetInventoryItemSafe(this, LockedItemSlot);
-                    unlockScroll = GetInventoryItemSafe(this, itemSlotId);
-                    if (!IsUsableItem(lockedItem) || lockedItem->ID64 != ID64 ||
-                        !IsUsableItem(unlockScroll) || unlockScroll->InstanceItem->RefItemID != itemId)
-                    {
-                        CSqlCon::SetItemLockState(ID64, true);
-                        CNetHelper::FreeMsg(newpMsg);
-                        CNetHelper::FreeMsg(pMsg2);
-                        CNetHelper::FreeMsg(pShardMsgFirst);
-                        SendItemLockFailure(this, 2, 2, static_cast<BYTE>(LockedItemSlot));
-                        return;
-                    }
-
-                    CSqlCon::RemoveLockedItem(ID64);
-                    this->SetLiveDeleteItem(itemSlotId, 1);
-
-                    *newpMsg << LockedItemSlot << ID64;
-                    *pMsg2 << unsigned int(this->GetGameID()); //flag opt lvl
-                    *pMsg2 << unsigned int(3769);
-                    *pShardMsgFirst << ID64;
-                    CNetHelper::SendMsgToSM(pShardMsgFirst);
-                    this->SendMsg(newpMsg);
-                    this->SendMsg(pMsg2);
-                }
+                *shard << completion.itemId;
+                CNetHelper::SendMsgToSM(shard);
             }
-            return;
+        }
+        CGObjPC* player = g_pCGame != NULL
+            ? g_pCGame->GetCharObjById(completion.characterId) : NULL;
+        if (player == NULL || player->GetGameID() != completion.playerGameId)
+        {
+            if (completion.succeeded ||
+                completion.resultCode == CSqlCon::ITEM_LOCK_STATE_ALREADY_SET)
+            {
+                if (completion.lockItem) CSqlCon::AddLockedItem(completion.itemId);
+                else CSqlCon::RemoveLockedItem(completion.itemId);
+            }
+            ItemLockPersistence::Release(completion.itemId);
+            continue;
+        }
+
+        CGItem* item = GetInventoryItemSafe(player, completion.itemSlot);
+        CGItem* scroll = GetInventoryItemSafe(player, completion.scrollSlot);
+        const bool identitiesMatch =
+            IsUsableItem(item) && item->ID64 == completion.itemId &&
+            IsUsableItem(scroll) && scroll->ID64 == completion.scrollItemId;
+        if (!completion.succeeded)
+        {
+            if (completion.resultCode == CSqlCon::ITEM_LOCK_STATE_ALREADY_SET)
+            {
+                if (completion.lockItem) CSqlCon::AddLockedItem(completion.itemId);
+                else CSqlCon::RemoveLockedItem(completion.itemId);
+            }
+            SendItemLockFailure(player, completion.lockItem ? 1 : 2, 1,
+                                static_cast<BYTE>(completion.itemSlot));
+            ItemLockPersistence::Release(completion.itemId);
+            continue;
+        }
+
+        // Durable SQL is authoritative even when the player changed inventory
+        // while the request was pending. Keep the cache consistent, but never
+        // consume a different scroll or publish a false per-player success.
+        if (completion.lockItem) CSqlCon::AddLockedItem(completion.itemId);
+        else CSqlCon::RemoveLockedItem(completion.itemId);
+        if (!identitiesMatch)
+        {
+            SendItemLockFailure(player, completion.lockItem ? 1 : 2, 2,
+                                static_cast<BYTE>(completion.itemSlot));
+            ItemLockPersistence::Release(completion.itemId);
+            continue;
+        }
+        const int beforeAmount = scroll->InstanceItem->Data;
+        player->SetLiveDeleteItem(completion.scrollSlot, 1);
+        if (beforeAmount <= 0 || !WasOneItemConsumed(
+                player, completion.scrollSlot, completion.scrollItemId, beforeAmount))
+        {
+            SendItemLockFailure(player, completion.lockItem ? 1 : 2, 2,
+                                static_cast<BYTE>(completion.itemSlot));
+            ItemLockPersistence::Release(completion.itemId);
+            continue;
+        }
+
+        CMsg* result = player->AllocMsg(completion.lockItem ? 0x5030 : 0x5031);
+        CMsg* effect = player->AllocMsg(0x305C);
+        if (result != NULL && effect != NULL)
+        {
+            *result << completion.itemSlot << completion.itemId;
+            *effect << static_cast<unsigned int>(player->GetGameID()) << static_cast<unsigned int>(3769);
+            player->SendMsg(result);
+            player->SendMsg(effect);
         }
         else
         {
-            CMsg* pck = this->AllocMsg(0x5015);
-            if (pck == NULL)
-                return;
-            *pck << byte(5);
-            this->SendMsg(pck);
-            return;
+            CNetHelper::FreeMsg(result); CNetHelper::FreeMsg(effect);
         }
+        ItemLockPersistence::Release(completion.itemId);
     }
 }
 void CGObjPC::HandleAlchemyLinkRequest(CMsg* pMsg)

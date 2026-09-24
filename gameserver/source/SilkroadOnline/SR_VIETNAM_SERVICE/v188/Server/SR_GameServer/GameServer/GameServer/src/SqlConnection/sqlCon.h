@@ -179,7 +179,7 @@ public:
     static bool IsItemLocked(INT64 itemId);
     static void AddLockedItem(INT64 itemId);
     static void RemoveLockedItem(INT64 itemId);
-    static ItemLockStateResult SetItemLockState(INT64 itemId, bool locked);
+    static ItemLockStateResult SetItemLockState(CDbConnection* connection, INT64 itemId, bool locked);
     static std::vector<INT64> LockedItemList;
 
     static BYTE GetItemBindingOpt(INT64 ID64);
