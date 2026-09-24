@@ -22,6 +22,27 @@
 
 namespace
 {
+    const size_t LIVE_SKILL_CODE_NAME_SIZE = 128;
+
+    bool TryReadLiveSkillCodeName(CMsg* message, std::string& skillCodeName)
+    {
+        if (message == NULL)
+            return false;
+
+        char rawCodeName[LIVE_SKILL_CODE_NAME_SIZE] = {0};
+        message->ReadBytes(rawCodeName, sizeof(rawCodeName));
+
+        const char* terminator = std::find(
+            rawCodeName,
+            rawCodeName + LIVE_SKILL_CODE_NAME_SIZE,
+            '\0');
+        if (terminator == rawCodeName || terminator == rawCodeName + LIVE_SKILL_CODE_NAME_SIZE)
+            return false;
+
+        skillCodeName.assign(rawCodeName, static_cast<size_t>(terminator - rawCodeName));
+        return true;
+    }
+
     bool IsValidDestination(int worldId, int regionId, int x, int y, int z)
     {
         return KmtGameServerCommand::IsValidDestination(worldId, regionId, x, y, z);
@@ -433,7 +454,8 @@ void CGame::ProcessMessage(CMsg *pMsg) {
                 int CharID;
                 std::string SkillCodeName;
                 *pMsg >> CharID;
-                pMsg->ReadString(SkillCodeName, 127);
+                if (!TryReadLiveSkillCodeName(pMsg, SkillCodeName))
+                    return;
                 CGObjPC* TargetChar = g_pCGame->GetCharObjById(CharID);
                 if (TargetChar != NULL && !SkillCodeName.empty())
                 {

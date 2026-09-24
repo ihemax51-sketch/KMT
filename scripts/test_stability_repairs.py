@@ -80,10 +80,14 @@ for wait_state in ("WAIT_OBJECT_0", "WAIT_TIMEOUT", "WAIT_FAILED"):
 require("SQL resources were retained" in game_sql,
         "GameServer does not retain SQL state after a failed join")
 
-require("ReadString(SkillCodeName, 127)" in game_message,
-        "ActionAddSkillByCode is not bounded")
-require("char SkillCodeName[128]" not in game_message,
-        "ActionAddSkillByCode still uses a fixed stack buffer")
+require("TryReadLiveSkillCodeName(pMsg, SkillCodeName)" in game_message,
+        "ActionAddSkillByCode does not use the fixed-width wire reader")
+require("message->ReadBytes(rawCodeName, sizeof(rawCodeName))" in game_message,
+        "ActionAddSkillByCode does not read its complete fixed-width payload")
+require("terminator == rawCodeName + LIVE_SKILL_CODE_NAME_SIZE" in game_message,
+        "ActionAddSkillByCode does not reject unterminated skill names")
+require("ReadString(SkillCodeName" not in game_message,
+        "ActionAddSkillByCode still treats its fixed-width payload as a length-prefixed string")
 require("void Read(void* dest, size_t count)" in log_message_h,
         "Custom log reader still narrows the byte count")
 

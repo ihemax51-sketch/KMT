@@ -1210,31 +1210,30 @@ void CGObjPC::HandleCustomReverseUseRequest(CMsg* pMsg) {
             if (reverseItem->InstanceItem->pCRefObjItem->TID.m_type_id_value == 6636 ||
                 reverseItem->InstanceItem->pCRefObjItem->TID.m_type_id_value == 6637) {
                 const INT64 reverseItemId = reverseItem->ID64;
-                const uint32_t targetWorldId = static_cast<uint32_t>(WorldID) + 0x10000;
-                bool moved = this->MoveTo(targetWorldId, wRegionID, X, Y, Z, 2);
-                if (!moved)
-                    moved = this->MoveTo(targetWorldId, wRegionID, X, Y, Z, 1);
-                if (!moved)
-                    return;
-
-                // MoveTo's return value is the native synchronous admission
-                // result. Re-resolve the reserved identity before consuming it;
-                // a failed move leaves both inventory and client effects intact.
-                reverseItem = GetInventoryItemSafe(this, SlotID);
-                if (!IsUsableItem(reverseItem) || reverseItem->ID64 != reverseItemId)
-                    return;
                 const int beforeAmount = reverseItem->InstanceItem->Data;
                 if (beforeAmount <= 0)
-                    return;
-                this->SetLiveDeleteItem(SlotID, 1);
-                if (!WasOneItemConsumed(this, SlotID, reverseItemId, beforeAmount))
                     return;
                 CMsg *effect = this->AllocMsg(0x305C);
                 if (effect == NULL)
                     return;
+                const uint32_t targetWorldId = static_cast<uint32_t>(WorldID) + 0x10000;
+
+                // Complete every inventory and use-effect operation before the
+                // native world-transfer handshake starts. Touching either state
+                // after MoveTo begins can corrupt the client's loading sequence
+                // and disconnect its Agent session.
+                this->SetLiveDeleteItem(SlotID, 1);
+                if (!WasOneItemConsumed(this, SlotID, reverseItemId, beforeAmount)) {
+                    CNetHelper::FreeMsg(effect);
+                    return;
+                }
                 *effect << static_cast<unsigned int>(this->GetGameID());
                 *effect << static_cast<unsigned int>(3769);
                 this->SendMsg(effect);
+
+                bool moved = this->MoveTo(targetWorldId, wRegionID, X, Y, Z, 2);
+                if (!moved)
+                    moved = this->MoveTo(targetWorldId, wRegionID, X, Y, Z, 1);
             }
         }
     }

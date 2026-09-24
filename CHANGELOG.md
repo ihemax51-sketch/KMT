@@ -2,13 +2,14 @@
 
 ## Update v7.0.4
 
-Release date: 2026-09-23
+Release date: 2026-09-24
 
 ### GameServer lifecycle and gameplay reliability
 
 - Made GameServer protection startup single-owner and fail-closed while privileged commands wait for security initialization.
 - Moved item lock and unlock persistence to a bounded database worker so database delays no longer block native packet processing.
 - Restored the known-working vSRO 188 Reverse transaction order so inventory and use-effect work finishes before native world transfer, preventing loading-state corruption and disconnects.
+- Restored live buff commands by safely decoding the existing fixed-width skill name sent to GameServer.
 - Delivered live damage rankings to every active encounter participant and preserved correct ranking beyond the 32-bit damage boundary while retaining the existing client packet format.
 - Aligned unique-spawn replay retention with its configured character cooldown without weakening authorization, location checks, or global pacing.
 - Made telemetry shutdown and restart ownership deterministic, including safe terminal behavior when file output cannot stop promptly.
