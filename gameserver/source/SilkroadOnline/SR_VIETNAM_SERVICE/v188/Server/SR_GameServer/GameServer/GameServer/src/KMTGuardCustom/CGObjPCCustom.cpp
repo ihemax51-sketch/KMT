@@ -1,3 +1,4 @@
+#include <KMTGuardCustom/GameServerRuntimeSafety.h>
 //
 // Created by YUMBUL on 21.06.2025.
 //
