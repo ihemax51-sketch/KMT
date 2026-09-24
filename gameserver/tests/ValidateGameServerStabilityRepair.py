@@ -33,10 +33,11 @@ assert '0x705D' in custom, 'item linking was unintentionally removed'
 assert 'AuthorizeAndConsume' in custom
 assert 'SetItemLockState(' not in custom, 'packet path still executes item-lock SQL'
 reverse=custom[custom.index('void CGObjPC::HandleCustomReverseUseRequest'):custom.index('void CGObjPC::HandleItemTranslateRequest')]
-assert reverse.index('MoveTo(targetWorldId') < reverse.index('SetLiveDeleteItem(SlotID, 1)')
-assert reverse.index('if (!moved)\n                    return;') < reverse.index('SetLiveDeleteItem(SlotID, 1)')
-assert reverse.index('SetLiveDeleteItem(SlotID, 1)') < reverse.index('this->SendMsg(effect)')
-assert reverse.index('WasOneItemConsumed') < reverse.index('this->SendMsg(effect)')
+assert reverse.index('SetLiveDeleteItem(SlotID, 1)') < reverse.index('this->SendMsg(pMsg32)')
+assert reverse.index('this->SendMsg(pMsg32)') < reverse.index('MoveTo(targetWorldId')
+after_move = reverse[reverse.index('MoveTo(targetWorldId'):]
+assert 'SetLiveDeleteItem' not in after_move
+assert 'SendMsg(pMsg32)' not in after_move
 
 unique=read('GameServer/GameServer/src/KMTGuardCustom/UniqueSpawnGuard.cpp')
 assert 'effectiveReplayWindow = s_replayWindowMs < s_cooldownMs' in unique
