@@ -1,3 +1,4 @@
+#include <KMTGuardCustom/GameServerRuntimeSafety.h>
 //
 // Created by YUMBUL on 21.06.2025.
 //
@@ -1208,25 +1209,32 @@ void CGObjPC::HandleCustomReverseUseRequest(CMsg* pMsg) {
         if (IsUsableItem(reverseItem)) {
             if (reverseItem->InstanceItem->pCRefObjItem->TID.m_type_id_value == 6636 ||
                 reverseItem->InstanceItem->pCRefObjItem->TID.m_type_id_value == 6637) {
-                CMsg *pMsg32 = this->AllocMsg(0x305C);
-                if (pMsg32 == NULL)
-                    return;
+                const INT64 reverseItemId = reverseItem->ID64;
                 const uint32_t targetWorldId = static_cast<uint32_t>(WorldID) + 0x10000;
-
-                // Finish the Reverse item transaction before MoveTo starts the
-                // world-transfer handshake.  Touching inventory state or sending
-                // the use effect after mode 2 begins can leave a normal client in
-                // its loading state and cause its Agent connection to be dropped.
-                this->SetLiveDeleteItem(SlotID, 1);
-                unsigned int pGameID = this->GetGameID();
-                unsigned int ScID = 3769;
-                *pMsg32 << pGameID; //flag opt lvl
-                *pMsg32 << ScID;
-                this->SendMsg(pMsg32);
-
                 bool moved = this->MoveTo(targetWorldId, wRegionID, X, Y, Z, 2);
                 if (!moved)
                     moved = this->MoveTo(targetWorldId, wRegionID, X, Y, Z, 1);
+                if (!moved)
+                    return;
+
+                // MoveTo's return value is the native synchronous admission
+                // result. Re-resolve the reserved identity before consuming it;
+                // a failed move leaves both inventory and client effects intact.
+                reverseItem = GetInventoryItemSafe(this, SlotID);
+                if (!IsUsableItem(reverseItem) || reverseItem->ID64 != reverseItemId)
+                    return;
+                const int beforeAmount = reverseItem->InstanceItem->Data;
+                if (beforeAmount <= 0)
+                    return;
+                this->SetLiveDeleteItem(SlotID, 1);
+                if (!WasOneItemConsumed(this, SlotID, reverseItemId, beforeAmount))
+                    return;
+                CMsg *effect = this->AllocMsg(0x305C);
+                if (effect == NULL)
+                    return;
+                *effect << static_cast<unsigned int>(this->GetGameID());
+                *effect << static_cast<unsigned int>(3769);
+                this->SendMsg(effect);
             }
         }
     }
